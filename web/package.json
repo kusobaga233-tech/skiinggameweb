@@ -1,0 +1,32 @@
+{
+  "name": "skiiing-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "check:boost-tutorial": "node scripts/check-boost-tutorial.mjs",
+    "check:brake": "node scripts/check-brake.mjs",
+    "check:course": "node scripts/check-course-profile.mjs",
+    "check:minimap": "node scripts/check-minimap.mjs",
+    "check:animation-debugger": "node scripts/check-animation-debugger.mjs",
+    "check:model-preview": "node scripts/check-model-preview.mjs",
+    "check:pump-drive": "node scripts/check-pump-drive.mjs",
+    "check:pause-inspector": "node scripts/check-pause-inspector.mjs",
+    "check:speed-cap": "node scripts/check-speed-cap.mjs",
+    "check:steering": "node scripts/check-steering-behavior.mjs",
+    "check:tuck": "node scripts/check-tuck-detection.mjs",
+    "check:turn-preview": "node scripts/check-turn-preview.mjs",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^8.26.0",
+    "@babylonjs/loaders": "^8.56.2",
+    "@mediapipe/tasks-vision": "^0.10.22-rc.20250304"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vite": "^7.1.3"
+  }
+}

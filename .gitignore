@@ -1,0 +1,16 @@
+web/node_modules/
+web/dist/
+web/.edge-headless/
+web/tmp-start-sequence-check-*/
+web/*.log
+web/*.err
+web/*preview-stdout.txt
+web/*preview-stderr.txt
+web/tsconfig.tsbuildinfo
+docs/
+.codexbridge/
+.venv*/
+node_modules/
+dist/
+*.log
+*.err
