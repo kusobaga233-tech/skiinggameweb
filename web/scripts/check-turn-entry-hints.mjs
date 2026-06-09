@@ -37,21 +37,23 @@ const secondHint = evaluateTurnEntryHint(secondTurn, course.courseHalfWidth);
 const thirdHint = evaluateTurnEntryHint(thirdTurn, course.courseHalfWidth);
 
 assert.equal(firstTurn.direction, "left", "expected first turn geometry to be left");
-assert.equal(firstHint.direction, "left", "expected first turn entry hint to steer left");
-assert.equal(firstHint.arrowText, "《《《", "expected first turn to demand a strong left line change");
-
-assert.equal(secondTurn.direction, "left", "expected second turn geometry to also be left");
 assert.equal(
-  secondHint.direction,
+  firstHint.direction,
   "right",
-  "expected second same-direction turn to request a right-side line correction instead of blindly repeating left"
+  "expected softened first turn to request a right-side line setup before the left turn"
 );
-assert.ok(
-  secondHint.arrowText === "》" || secondHint.arrowText === "》》",
-  `expected second turn to show a lighter right correction, got ${secondHint.arrowText}`
-);
+assert.ok(firstHint.arrowText.includes("》"), `expected first turn to show a right setup arrow, got ${firstHint.arrowText}`);
+
+assert.equal(secondTurn.direction, "right", "expected second turn geometry to be right");
+assert.equal(secondHint.direction, "right", "expected second turn entry hint to steer right");
+assert.ok(secondHint.arrowText.includes("》"), `expected second turn to show right arrows, got ${secondHint.arrowText}`);
 
 assert.equal(thirdTurn.direction, "right", "expected third turn geometry to be right");
-assert.equal(thirdHint.direction, "right", "expected third turn entry hint to also steer right");
+assert.equal(
+  thirdHint.direction,
+  "left",
+  "expected third same-direction turn to request a left-side line correction"
+);
+assert.ok(thirdHint.arrowText.includes("《"), `expected third turn to show left arrows, got ${thirdHint.arrowText}`);
 
 console.log("Turn entry hint logic OK");

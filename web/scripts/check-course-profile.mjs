@@ -28,8 +28,8 @@ const {
 
 const course = createTrackCourse();
 
-assert.equal(course.length, 2600, `expected course length to remain 2600, got ${course.length}`);
-assert.equal(course.gates.length, 18, `expected 18 gates on spiral course, got ${course.gates.length}`);
+assert.equal(course.length, 5200, `expected softened course length to be 5200, got ${course.length}`);
+assert.equal(course.gates.length, 37, `expected 37 gates on softened spiral course, got ${course.gates.length}`);
 assert.equal(course.ramps.length, 11, `expected existing 11 ramps to remain, got ${course.ramps.length}`);
 assert.ok(course.turnMarkers.length >= 9, `expected spiral turn markers to be rebuilt, got ${course.turnMarkers.length}`);
 
@@ -44,7 +44,7 @@ for (const gate of course.gates) {
     Math.abs(gate.centerX - centerX) <= course.courseHalfWidth - gate.halfWidth,
     `expected gate ${gate.index} to stay inside spiral lane`
   );
-  assert.equal(gate.halfWidth, 2.9, `expected widened spiral gate ${gate.index}, got ${gate.halfWidth}`);
+  assert.equal(gate.halfWidth, 5.8, `expected doubled spiral gate ${gate.index}, got ${gate.halfWidth}`);
 }
 
 const startY = evaluateCourseElevation(0);

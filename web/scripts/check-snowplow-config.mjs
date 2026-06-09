@@ -55,7 +55,7 @@ assert.ok(
   "expected snowplow braking to no longer require being inside a marked turn region"
 );
 assert.ok(
-  skierControllerSource.includes("this.turnSnowplowSpeedReduction = config.turnSnowplowSpeedReduction ?? 120;"),
+  skierControllerSource.includes("this.turnSnowplowSpeedReduction = config.turnSnowplowSpeedReduction ?? 150;"),
   "expected stronger configurable snowplow speed reduction default"
 );
 

@@ -71,20 +71,21 @@ export interface TurnEntryHintData {
 }
 
 const COURSE_HALF_WIDTH = 12.0;
-const COURSE_LENGTH = 2600;
+const COURSE_LENGTH = 5200;
 const SAMPLE_STEP = 10;
 export const COURSE_Y_OFFSET = 100;
 const SPIRAL_CREST_Z = 760;
 const SPIRAL_PHASE_OFFSET = -0.55;
-const SPIRAL_PHASE_SCALE = (Math.PI * 2) / 360;
+const SPIRAL_PHASE_SCALE = (Math.PI * 2) / 720;
 const SPIRAL_RADIUS_MIN = 5.5;
 const SPIRAL_RADIUS_MAX = 15.5;
-const SPIRAL_TURN_LENGTH = 260;
+const SPIRAL_TURN_LENGTH = 520;
 const COURSE_BENDS: BendSegment[] = [];
 const COURSE_SWEEP_TURNS: SweepTurnSegment[] = [];
 const GATE_SPACING = 140;
 const FIRST_GATE_Z = 110;
-const GATE_COUNT = 18;
+const GATE_HALF_WIDTH = 5.8;
+const GATE_COUNT = Math.floor((COURSE_LENGTH - FIRST_GATE_Z) / GATE_SPACING) + 1;
 let activeTrackId: TrackCourseId = "track1";
 
 function clamp(value: number, min: number, max: number): number {
@@ -279,19 +280,19 @@ function createTrack1Gates(turnMarkers: TurnMarkerData[]): GateData[] {
   for (let index = 0; index < GATE_COUNT; index += 1) {
     const z = FIRST_GATE_Z + index * GATE_SPACING;
     const courseCenter = evaluateCourseCenterX(z);
-    const guidingOffset = evaluateGateGuideOffset(z, turnMarkers, COURSE_HALF_WIDTH - 2.5);
+    const guidingOffset = evaluateGateGuideOffset(z, turnMarkers, COURSE_HALF_WIDTH - GATE_HALF_WIDTH);
     const cadenceOffset = (index % 2 === 0 ? -1 : 1) * (0.72 + (index % 3) * 0.18);
     const laneOffset = Math.abs(guidingOffset) > 0.01 ? guidingOffset : cadenceOffset;
     const centerX = clamp(
       courseCenter + laneOffset,
-      courseCenter - COURSE_HALF_WIDTH + 1.9,
-      courseCenter + COURSE_HALF_WIDTH - 1.9
+      courseCenter - COURSE_HALF_WIDTH + GATE_HALF_WIDTH,
+      courseCenter + COURSE_HALF_WIDTH - GATE_HALF_WIDTH
     );
     gates.push({
       index: index + 1,
       centerX,
       z,
-      halfWidth: 2.9,
+      halfWidth: GATE_HALF_WIDTH,
       state: "pending"
     });
   }
@@ -305,9 +306,9 @@ function createTrack2Gates(): GateData[] {
     const alternatingOffset = index % 2 === 0 ? -4.4 : 4.4;
     gates.push({
       index: index + 1,
-      centerX: clamp(alternatingOffset, -COURSE_HALF_WIDTH + 1.9, COURSE_HALF_WIDTH - 1.9),
+      centerX: clamp(alternatingOffset, -COURSE_HALF_WIDTH + GATE_HALF_WIDTH, COURSE_HALF_WIDTH - GATE_HALF_WIDTH),
       z,
-      halfWidth: 2.9,
+      halfWidth: GATE_HALF_WIDTH,
       state: "pending"
     });
   }
@@ -319,7 +320,7 @@ function createTrack1Ramps(): RampData[] {
   const smallRampHalfWidth = 1.15;
   const smallRampLength = 5.2;
   const smallRampSurfaceRise = 1.1;
-  const rampZs = [250, 520, 690, 960, 1180, 1450, 1605, 1940];
+  const rampZs = [500, 1040, 1380, 1920, 2360, 2900, 3210, 3880];
   for (let index = 0; index < rampZs.length; index += 1) {
     const centerZ = rampZs[index];
     const courseCenter = evaluateCourseCenterX(centerZ);
@@ -344,7 +345,7 @@ function createTrack1Ramps(): RampData[] {
   const trackWideRampHalfWidth = COURSE_HALF_WIDTH;
   const trackWideRampLength = smallRampLength * 1.95;
   const trackWideRampSurfaceRise = smallRampSurfaceRise * 1.85;
-  const trackWideRampZs = [900, 1710];
+  const trackWideRampZs = [1800, 3420];
   for (const centerZ of trackWideRampZs) {
     ramps.push({
       index: ramps.length + 1,
@@ -359,7 +360,7 @@ function createTrack1Ramps(): RampData[] {
     });
   }
 
-  const largeRampZ = 2060;
+  const largeRampZ = 4120;
   const largeRampHalfWidth = smallRampHalfWidth * 3;
   const largeRampCourseCenter = evaluateCourseCenterX(largeRampZ);
   ramps.push({
@@ -383,8 +384,8 @@ function createTrack1Ramps(): RampData[] {
 
 function createTurnMarkers(): TurnMarkerData[] {
   const markers: Array<Omit<TurnMarkerData, "index" | "label" | "centerX">> = [];
-  for (let start = 140; start < COURSE_LENGTH - 130; start += SPIRAL_TURN_LENGTH) {
-    const end = Math.min(start + SPIRAL_TURN_LENGTH, COURSE_LENGTH - 40);
+  for (let start = 140; start <= COURSE_LENGTH - SPIRAL_TURN_LENGTH - 40; start += SPIRAL_TURN_LENGTH) {
+    const end = start + SPIRAL_TURN_LENGTH;
     const apexZ = start + (end - start) * 0.5;
     const beforeX = evaluateCourseCenterX(Math.max(0, apexZ - 24));
     const afterX = evaluateCourseCenterX(Math.min(COURSE_LENGTH, apexZ + 24));
@@ -443,11 +444,11 @@ function evaluateGateGuideOffset(z: number, turnMarkers: TurnMarkerData[], guide
 
 function evaluateTurnGuideX(turn: TurnMarkerData, z: number, courseHalfWidth: number): number {
   const centerX = evaluateCourseCenterX(z);
-  const guideOffset = evaluateGateGuideOffset(z, [turn], courseHalfWidth - 2.5);
+  const guideOffset = evaluateGateGuideOffset(z, [turn], courseHalfWidth - GATE_HALF_WIDTH);
   return clamp(
     centerX + guideOffset,
-    centerX - courseHalfWidth + 1.9,
-    centerX + courseHalfWidth - 1.9
+    centerX - courseHalfWidth + GATE_HALF_WIDTH,
+    centerX + courseHalfWidth - GATE_HALF_WIDTH
   );
 }
 

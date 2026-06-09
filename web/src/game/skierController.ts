@@ -167,14 +167,14 @@ export class SkierController {
     config: SkierControllerConfig = {}
   ) {
     this.poseSteerScale = config.poseSteerScale ?? 1.25;
-    this.maxForwardSpeed = config.maxForwardSpeed ?? 90;
-    this.downhillSpeedBoost = config.downhillSpeedBoost ?? 177;
+    this.maxForwardSpeed = config.maxForwardSpeed ?? 120;
+    this.downhillSpeedBoost = config.downhillSpeedBoost ?? 230;
     this.accelerationResponse = config.accelerationResponse ?? 6.2;
-    this.driveSpeedBoost = config.driveSpeedBoost ?? 16.5;
+    this.driveSpeedBoost = config.driveSpeedBoost ?? 22;
     this.driveDownhillSynergy = config.driveDownhillSynergy ?? 0.8;
     this.maxTuckSpeedBonusRatio = config.maxTuckSpeedBonusRatio ?? 0.1;
-    this.startSpeedLimit = config.startSpeedLimit ?? 18;
-    this.pumpImpulseBoost = config.pumpImpulseBoost ?? 5.8;
+    this.startSpeedLimit = config.startSpeedLimit ?? 24;
+    this.pumpImpulseBoost = config.pumpImpulseBoost ?? 7.8;
     this.carveRadiusMin = config.carveRadiusMin ?? 14;
     this.carveRadiusMax = config.carveRadiusMax ?? 118;
     this.lowSpeedTurnScale = config.lowSpeedTurnScale ?? 0.55;
@@ -187,7 +187,7 @@ export class SkierController {
     this.turnSnowplowReleaseDuration = config.turnSnowplowReleaseDuration ?? 0.16;
     this.turnSnowplowMinSpeed = config.turnSnowplowMinSpeed ?? 35;
     this.turnSnowplowMaxBlend = config.turnSnowplowMaxBlend ?? 1;
-    this.turnSnowplowSpeedReduction = config.turnSnowplowSpeedReduction ?? 120;
+    this.turnSnowplowSpeedReduction = config.turnSnowplowSpeedReduction ?? 150;
     this.snowplowStopResponseMin = config.snowplowStopResponseMin ?? 4;
     this.snowplowStopResponseMax = config.snowplowStopResponseMax ?? 12;
   }

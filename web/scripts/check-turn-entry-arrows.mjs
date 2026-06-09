@@ -26,8 +26,8 @@ assert.ok(
 );
 
 assert.ok(
-  sourceText.includes("const edgeSign = turn.direction === \"left\" ? 1 : -1"),
-  "expected turn entry signs to choose the outside course edge based on turn direction"
+  sourceText.includes("const edgeSign = entryHint.direction === \"left\" ? 1 : -1"),
+  "expected turn entry signs to sit on the opposite course edge from the displayed arrow direction"
 );
 
 assert.ok(

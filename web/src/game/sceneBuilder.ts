@@ -468,7 +468,7 @@ function createTurnEntryArrowSigns(scene: Scene, course: TrackCourse): void {
     const entryHint = evaluateTurnEntryHint(turn, course.courseHalfWidth);
     const entryMidZ = turn.start - 58;
     const baseY = sampleHeight(course, entryMidZ);
-    const edgeSign = turn.direction === "left" ? 1 : -1;
+    const edgeSign = entryHint.direction === "left" ? 1 : -1;
     const centerX = evaluateCourseCenterX(entryMidZ) + edgeSign * (course.courseHalfWidth + 3.2);
 
     const post = MeshBuilder.CreateCylinder(`turn-entry-arrow-post-${turn.index}`, {

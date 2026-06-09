@@ -28,8 +28,8 @@ const {
 
 const course = createTrackCourse();
 
-assert.equal(course.length, 2600, `expected course length to remain 2600, got ${course.length}`);
-assert.equal(course.gates.length, 18, `expected spiral course gate count to be rebuilt, got ${course.gates.length}`);
+assert.equal(course.length, 5200, `expected softened course length to be 5200, got ${course.length}`);
+assert.equal(course.gates.length, 37, `expected softened spiral course gate count to be rebuilt, got ${course.gates.length}`);
 assert.ok(course.turnMarkers.length >= 8, `expected spiral turn markers, got ${course.turnMarkers.length}`);
 
 const startY = evaluateCourseElevation(0);
