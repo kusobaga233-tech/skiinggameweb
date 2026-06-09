@@ -40,6 +40,20 @@ carve_radius_input_bias=0.08
 # carve_radius_input_floor：半径计算的输入下限；越小，轻微转向时的最低转向强度越低。
 carve_radius_input_floor=0.1
 
+# 弱辅助走线参数。
+# gameplay_line_assist_strength：角色自动贴近旗门走线的强度；0 关闭，越大越像被线牵引。
+gameplay_line_assist_strength=0.32
+# gameplay_line_player_offset_scale：玩家转向输入转成相对走线偏移的倍率；越大，小输入越容易偏离走线。
+gameplay_line_player_offset_scale=4.8
+# gameplay_line_max_offset：玩家相对走线可请求的最大横向偏移距离。
+gameplay_line_max_offset=6.5
+# gameplay_line_lookahead：走线辅助向前看的距离；越大越提前修正，越小越贴当前点。
+gameplay_line_lookahead=24
+# gameplay_line_turn_reduce：大弯区自动贴线保留比例；越小，大弯越依赖玩家主动控制。
+gameplay_line_turn_reduce=0.45
+# gameplay_line_max_yaw：走线辅助每帧能施加的最大朝向修正，避免强行拉拽。
+gameplay_line_max_yaw=0.42
+
 # 搓雪减速参数。
 # turn_snowplow_steer_start：开始进入搓雪减速的转向输入阈值；越小越容易触发。
 turn_snowplow_steer_start=0.5

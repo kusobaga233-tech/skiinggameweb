@@ -41,6 +41,12 @@ export interface SkierControllerConfig {
   lowSpeedTurnScale?: number;
   carveRadiusInputBias?: number;
   carveRadiusInputFloor?: number;
+  gameplayLineAssistStrength?: number;
+  gameplayLinePlayerOffsetScale?: number;
+  gameplayLineMaxOffset?: number;
+  gameplayLineLookahead?: number;
+  gameplayLineTurnReduce?: number;
+  gameplayLineMaxYaw?: number;
   turnSnowplowSteerStart?: number;
   turnSnowplowSteerRelease?: number;
   turnSnowplowSteerFull?: number;
@@ -133,6 +139,12 @@ export class SkierController {
   private readonly carveRadiusMax: number;
   private readonly carveRadiusInputBias: number;
   private readonly carveRadiusInputFloor: number;
+  private readonly gameplayLineAssistStrength: number;
+  private readonly gameplayLinePlayerOffsetScale: number;
+  private readonly gameplayLineMaxOffset: number;
+  private readonly gameplayLineLookahead: number;
+  private readonly gameplayLineTurnReduce: number;
+  private readonly gameplayLineMaxYaw: number;
   private readonly carveSpeedAlignmentMin = 1.8;
   private readonly carveSpeedAlignmentMax = 9.4;
   private readonly carveDriftDrag = 8.5;
@@ -180,6 +192,12 @@ export class SkierController {
     this.lowSpeedTurnScale = config.lowSpeedTurnScale ?? 0.55;
     this.carveRadiusInputBias = config.carveRadiusInputBias ?? 0.08;
     this.carveRadiusInputFloor = config.carveRadiusInputFloor ?? 0.1;
+    this.gameplayLineAssistStrength = config.gameplayLineAssistStrength ?? 0.32;
+    this.gameplayLinePlayerOffsetScale = config.gameplayLinePlayerOffsetScale ?? 4.8;
+    this.gameplayLineMaxOffset = config.gameplayLineMaxOffset ?? 6.5;
+    this.gameplayLineLookahead = config.gameplayLineLookahead ?? 24;
+    this.gameplayLineTurnReduce = config.gameplayLineTurnReduce ?? 0.45;
+    this.gameplayLineMaxYaw = config.gameplayLineMaxYaw ?? 0.42;
     this.turnSnowplowSteerStart = config.turnSnowplowSteerStart ?? 0.5;
     this.turnSnowplowSteerRelease = config.turnSnowplowSteerRelease ?? 0.36;
     this.turnSnowplowSteerFull = config.turnSnowplowSteerFull ?? 0.82;
@@ -221,6 +239,10 @@ export class SkierController {
     this.startBoostBonusRatio = this.clamp(ratio, 0, 0.3);
   }
 
+  playPolePlantAnimation(): void {
+    this.pumpPoseTimer = this.pumpPoseDuration;
+  }
+
   update(motion: MotionState, dt: number, movementEnabled = true): SkierSnapshot {
     const sourceSteerScale = motion.source === "pose" ? this.poseSteerScale : 1;
     const steerTarget = movementEnabled && motion.tracking ? this.clamp(motion.steer * sourceSteerScale, -1, 1) : 0;
@@ -229,7 +251,7 @@ export class SkierController {
     this.currentSteer = this.lerp(this.currentSteer, steerTarget, dt * this.steerSmooth);
     this.currentTuck = this.lerp(this.currentTuck, targetTuck, dt * this.tuckSmooth);
     if (motion.pumpTriggered) {
-      this.pumpPoseTimer = this.pumpPoseDuration;
+      this.playPolePlantAnimation();
     } else {
       this.pumpPoseTimer = Math.max(0, this.pumpPoseTimer - dt);
     }
@@ -337,7 +359,7 @@ export class SkierController {
       );
     }
     const groundedForCarve = this.isGrounded();
-    this.updateMovementHeading(dt, groundedForCarve);
+    this.updateMovementHeading(dt, groundedForCarve, upcomingTurnPreview.blend);
     const previousZ = this.skier.position.z;
     const turnPreview = upcomingTurnPreview;
     const previousX = this.skier.position.x;
@@ -599,7 +621,7 @@ export class SkierController {
     return holdFactor * intent * this.turnSnowplowMaxBlend;
   }
 
-  private updateMovementHeading(dt: number, grounded: boolean): void {
+  private updateMovementHeading(dt: number, grounded: boolean, turnPreviewBlend: number): void {
     const speedBlend = this.clamp(this.currentForwardSpeed / Math.max(this.maxForwardSpeed, 1e-5), 0, 1);
     const speedTurnPenalty = this.lerp(this.lowSpeedTurnScale, this.highSpeedTurnScale, speedBlend);
     const tuckTurnPenalty = this.lerp(1, 0.82, this.currentTuck);
@@ -620,6 +642,60 @@ export class SkierController {
     const neutralReturnBlend = this.evaluateNeutralReturnBlend();
     const neutralReturnRate = this.headingNeutralReturnRate * this.lerp(0.8, 1.2, neutralReturnBlend) * this.lerp(1, 0.72, speedBlend);
     this.movementHeadingYaw = this.lerp(this.movementHeadingYaw, 0, neutralReturnRate * dt);
+    this.movementHeadingYaw = this.clamp(
+      this.movementHeadingYaw + this.evaluateGameplayLineAssistYaw(turnPreviewBlend, dt, grounded),
+      -this.maxMovementHeadingYaw,
+      this.maxMovementHeadingYaw
+    );
+  }
+
+  private evaluateGameplayLineAssistYaw(turnPreviewBlend: number, dt: number, grounded: boolean): number {
+    if (!grounded || this.gameplayLineAssistStrength <= 0 || this.currentForwardSpeed < this.minForwardSpeed) {
+      return 0;
+    }
+
+    const lookaheadZ = this.skier.position.z + this.gameplayLineLookahead;
+    const gameplayLineX = this.evaluateGameplayLineX(lookaheadZ);
+    const playerOffset = this.clamp(
+      this.currentSteer * this.gameplayLinePlayerOffsetScale,
+      -this.gameplayLineMaxOffset,
+      this.gameplayLineMaxOffset
+    );
+    const targetLineX = gameplayLineX + playerOffset;
+    const lineErrorX = targetLineX - this.skier.position.x;
+    const turnAssistScale = this.lerp(1, this.gameplayLineTurnReduce, this.clamp(turnPreviewBlend, 0, 1));
+    const speedScale = this.clamp(this.currentForwardSpeed / Math.max(this.maxForwardSpeed * 0.45, 1e-5), 0.25, 1);
+    const requestedYaw = lineErrorX * this.gameplayLineAssistStrength * turnAssistScale * speedScale;
+    return this.clamp(requestedYaw * dt, -this.gameplayLineMaxYaw * dt, this.gameplayLineMaxYaw * dt);
+  }
+
+  private evaluateGameplayLineX(z: number): number {
+    const gates = this.course.gates;
+    if (gates.length === 0) {
+      return evaluateCourseCenterX(z);
+    }
+
+    if (z <= gates[0].z) {
+      return gates[0].centerX;
+    }
+
+    const lastGate = gates[gates.length - 1];
+    if (z >= lastGate.z) {
+      return lastGate.centerX;
+    }
+
+    for (let index = 1; index < gates.length; index += 1) {
+      const previousGate = gates[index - 1];
+      const nextGate = gates[index];
+      if (z > nextGate.z) {
+        continue;
+      }
+
+      const t = this.clamp((z - previousGate.z) / Math.max(nextGate.z - previousGate.z, 1e-5), 0, 1);
+      return this.lerp(previousGate.centerX, nextGate.centerX, t);
+    }
+
+    return evaluateCourseCenterX(z);
   }
 
   private updateCarvingVelocity(

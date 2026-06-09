@@ -241,6 +241,7 @@ export class GameApp {
     this.startBoostLocked = true;
     this.startBoostBonusRatio = this.startBoostProgress * this.maxStartBoostBonusRatio;
     this.skierController.setStartBoostBonusRatio(this.startBoostBonusRatio);
+    this.skierController.playPolePlantAnimation();
   }
 
   private shouldUpdateUi(): boolean {

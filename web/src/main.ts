@@ -10,7 +10,6 @@ import { ControlPanel } from "./ui/controlPanel";
 import { Hud } from "./ui/hud";
 import { MiniMap } from "./ui/miniMap";
 import { PoseOverlay } from "./ui/poseOverlay";
-import { SpeedLines } from "./ui/speedLines";
 import { SpeedMeter } from "./ui/speedMeter";
 import { StartBoostMeter } from "./ui/startBoostMeter";
 import { loadRuntimeConfig } from "./config/runtimeConfig";
@@ -39,7 +38,6 @@ const speedMeterShell = requiredElement<HTMLElement>("speed-meter");
 const speedMeterValue = requiredElement<HTMLElement>("speed-meter-value");
 const speedMeterBar = requiredElement<HTMLElement>("speed-meter-bar");
 const speedMeterGates = requiredElement<HTMLElement>("speed-meter-gates");
-const speedLinesShell = requiredElement<HTMLElement>("speed-lines");
 const cameraSelect = requiredElement<HTMLSelectElement>("camera-select");
 const cameraStatus = requiredElement<HTMLElement>("camera-status");
 const refreshButton = requiredElement<HTMLButtonElement>("refresh-cameras");
@@ -49,6 +47,11 @@ const pauseButton = requiredElement<HTMLButtonElement>("toggle-pause");
 const meshPickOutput = requiredElement<HTMLElement>("mesh-pick-output");
 const track1Button = requiredElement<HTMLButtonElement>("track-1-button");
 const track2Button = requiredElement<HTMLButtonElement>("track-2-button");
+const hudPanel = requiredElement<HTMLElement>("hud-panel");
+const minimapPanel = requiredElement<HTMLElement>("minimap-panel");
+const controlPanelShell = requiredElement<HTMLElement>("control-panel");
+const hudPanelToggle = requiredElement<HTMLButtonElement>("toggle-hud-panel");
+const minimapPanelToggle = requiredElement<HTMLButtonElement>("toggle-minimap-panel");
 
 const cameraManager = new CameraManager(video);
 const fallback = new KeyboardFallback();
@@ -56,7 +59,6 @@ const hud = new Hud(hudOutput, poseStatus);
 const boostTutorialVideo = new BoostTutorialVideo(boostTutorialShell, boostTutorialVideoElement);
 const startBoostMeter = new StartBoostMeter(startBoostShell, startBoostFill, startBoostValue);
 const speedMeter = new SpeedMeter(speedMeterShell, speedMeterValue, speedMeterBar, speedMeterGates);
-const speedLines = new SpeedLines(speedLinesShell);
 const controlPanel = new ControlPanel(cameraSelect, cameraStatus);
 const poseOverlay = new PoseOverlay(poseOverlayCanvas, video);
 const selectedCameraStorageKey = "skiiing.web.selectedCamera";
@@ -102,6 +104,23 @@ function syncPauseUi(paused: boolean, pickedText?: string): void {
   meshPickOutput.textContent = pickedText ?? buildPauseInspectorText(paused, null);
 }
 
+function bindPanelToggle(panel: HTMLElement, button: HTMLButtonElement, linkedPanels: HTMLElement[] = []): void {
+  const sync = (): void => {
+    const collapsed = panel.classList.contains("is-collapsed");
+    button.textContent = collapsed ? "显示" : "隐藏";
+    button.setAttribute("aria-expanded", String(!collapsed));
+    for (const linkedPanel of linkedPanels) {
+      linkedPanel.classList.toggle("is-hidden-with-hud", collapsed);
+    }
+  };
+
+  button.addEventListener("click", () => {
+    panel.classList.toggle("is-collapsed");
+    sync();
+  });
+  sync();
+}
+
 function showFatalStartupError(message: string): void {
   hudOutput.textContent = `Startup failed: ${message}`;
   poseStatus.textContent = `Startup failed: ${message}`;
@@ -136,6 +155,12 @@ async function ensureGameApp(): Promise<GameApp> {
           lowSpeedTurnScale: runtimeConfig.lowSpeedTurnScale,
           carveRadiusInputBias: runtimeConfig.carveRadiusInputBias,
           carveRadiusInputFloor: runtimeConfig.carveRadiusInputFloor,
+          gameplayLineAssistStrength: runtimeConfig.gameplayLineAssistStrength,
+          gameplayLinePlayerOffsetScale: runtimeConfig.gameplayLinePlayerOffsetScale,
+          gameplayLineMaxOffset: runtimeConfig.gameplayLineMaxOffset,
+          gameplayLineLookahead: runtimeConfig.gameplayLineLookahead,
+          gameplayLineTurnReduce: runtimeConfig.gameplayLineTurnReduce,
+          gameplayLineMaxYaw: runtimeConfig.gameplayLineMaxYaw,
           turnSnowplowSteerStart: runtimeConfig.turnSnowplowSteerStart,
           turnSnowplowSteerRelease: runtimeConfig.turnSnowplowSteerRelease,
           turnSnowplowSteerFull: runtimeConfig.turnSnowplowSteerFull,
@@ -152,7 +177,6 @@ async function ensureGameApp(): Promise<GameApp> {
           app.setMotionState(currentMotion());
           hud.render(hudState);
           speedMeter.render(hudState);
-          speedLines.render(hudState.speed);
           boostTutorialVideo.render(hudState.motion);
           startBoostMeter.render(hudState);
           miniMap?.render(hudState);
@@ -361,6 +385,8 @@ canvas.addEventListener("click", async (event) => {
 });
 
 void (async () => {
+  bindPanelToggle(hudPanel, hudPanelToggle, [controlPanelShell]);
+  bindPanelToggle(minimapPanel, minimapPanelToggle);
   syncTrackButtons(selectedTrackId);
   const app = await ensureGameApp();
   syncPauseUi(app.isPaused());

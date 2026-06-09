@@ -6,6 +6,7 @@ export class KeyboardFallback {
   private drive = 0;
   private leftScrapePole = 0;
   private rightScrapePole = 0;
+  private pumpTriggeredQueued = false;
 
   constructor(target: Window = window) {
     target.addEventListener("keydown", (event) => this.handleKeyDown(event));
@@ -13,13 +14,16 @@ export class KeyboardFallback {
   }
 
   consumeState(): MotionState {
+    const pumpTriggered = this.pumpTriggeredQueued;
+    this.pumpTriggeredQueued = false;
+
     const state: MotionState = {
       steer: this.steer,
       snowplow: 0,
       tuck: this.tuck,
       brake: 0,
       jumpTriggered: false,
-      pumpTriggered: false,
+      pumpTriggered,
       drive: this.drive,
       pumpActive: this.drive > 0,
       pumpHits: this.drive > 0 ? 3 : 0,
@@ -45,6 +49,9 @@ export class KeyboardFallback {
     } else if (event.code === "KeyD") {
       this.steer = -1;
     } else if (event.code === "KeyW") {
+      if (this.drive === 0) {
+        this.pumpTriggeredQueued = true;
+      }
       this.drive = 1;
     } else if (event.code === "KeyJ") {
       this.leftScrapePole = 1;

@@ -17,6 +17,12 @@ export interface RuntimeConfig {
   lowSpeedTurnScale?: number;
   carveRadiusInputBias?: number;
   carveRadiusInputFloor?: number;
+  gameplayLineAssistStrength?: number;
+  gameplayLinePlayerOffsetScale?: number;
+  gameplayLineMaxOffset?: number;
+  gameplayLineLookahead?: number;
+  gameplayLineTurnReduce?: number;
+  gameplayLineMaxYaw?: number;
   turnSnowplowSteerStart?: number;
   turnSnowplowSteerRelease?: number;
   turnSnowplowSteerFull?: number;
@@ -125,6 +131,36 @@ function parseRuntimeConfig(text: string): RuntimeConfig {
 
     if (key === "carve_radius_input_floor") {
       config.carveRadiusInputFloor = parsed;
+      return true;
+    }
+
+    if (key === "gameplay_line_assist_strength") {
+      config.gameplayLineAssistStrength = parsed;
+      return true;
+    }
+
+    if (key === "gameplay_line_player_offset_scale") {
+      config.gameplayLinePlayerOffsetScale = parsed;
+      return true;
+    }
+
+    if (key === "gameplay_line_max_offset") {
+      config.gameplayLineMaxOffset = parsed;
+      return true;
+    }
+
+    if (key === "gameplay_line_lookahead") {
+      config.gameplayLineLookahead = parsed;
+      return true;
+    }
+
+    if (key === "gameplay_line_turn_reduce") {
+      config.gameplayLineTurnReduce = parsed;
+      return true;
+    }
+
+    if (key === "gameplay_line_max_yaw") {
+      config.gameplayLineMaxYaw = parsed;
       return true;
     }
 

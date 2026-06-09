@@ -159,8 +159,8 @@ export class MotionMapper {
     let tuckRaw = 0;
     if (legTracking) {
       const normalizedKnee = clamp(sample.kneeRatio / Math.max(this.baselineKneeRatio, 1e-5), 0.5, 1.08);
-      const tuckStartThreshold = 0.92;
-      const tuckFullThreshold = 0.79;
+      const tuckStartThreshold = 0.97;
+      const tuckFullThreshold = 0.86;
       tuckRaw = clamp(
         (tuckStartThreshold - normalizedKnee) / Math.max(tuckStartThreshold - tuckFullThreshold, 1e-5),
         0,

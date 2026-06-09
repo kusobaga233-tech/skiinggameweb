@@ -54,6 +54,9 @@ target.dispatch("keydown", "KeyW");
 let state = keyboard.consumeState();
 assert.equal(state.drive, 1, "expected W to stay as forward double-pole drive");
 assert.equal(state.snowplow, 0, "expected W drive alone not to inject scrape braking");
+assert.equal(state.pumpTriggered, true, "expected pressing W to emit one pole-plant animation trigger");
+state = keyboard.consumeState();
+assert.equal(state.pumpTriggered, false, "expected held W to avoid replaying pole-plant animation every frame");
 
 target.dispatch("keydown", "KeyJ");
 state = keyboard.consumeState();
@@ -79,5 +82,10 @@ state = keyboard.consumeState();
 assert.equal(state.drive, 0, "expected releasing W to clear forward drive");
 assert.equal(state.snowplow, 0, "expected releasing J/K to keep scrape input disabled");
 assert.equal(state.tuck, 0, "expected releasing S to clear tuck");
+
+target.dispatch("keydown", "KeyW");
+state = keyboard.consumeState();
+assert.equal(state.pumpTriggered, true, "expected pressing W again after release to replay pole-plant animation once");
+target.dispatch("keyup", "KeyW");
 
 console.log("Keyboard fallback OK");

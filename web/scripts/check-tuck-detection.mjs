@@ -57,7 +57,7 @@ for (let index = 1; index <= 6; index += 1) {
 assert.ok(motion.tuck <= 0.01, `expected neutral stance to stay near zero tuck, got ${motion.tuck.toFixed(2)}`);
 
 for (let index = 7; index <= 14; index += 1) {
-  motion = mapper.mapSample(createSample(index * 33, 0.965));
+  motion = mapper.mapSample(createSample(index * 33, 0.985));
 }
 
 assert.ok(
@@ -66,6 +66,15 @@ assert.ok(
 );
 
 for (let index = 15; index <= 22; index += 1) {
+  motion = mapper.mapSample(createSample(index * 33, 0.94));
+}
+
+assert.ok(
+  motion.tuck >= 0.24,
+  `expected moderate crouch to register after relaxed tuck thresholds, got ${motion.tuck.toFixed(2)}`
+);
+
+for (let index = 23; index <= 30; index += 1) {
   motion = mapper.mapSample(createSample(index * 33, 0.78, 1, 0));
 }
 
@@ -74,7 +83,7 @@ assert.ok(
   `expected upper-body-only neutral stance to avoid tuck boost, got ${motion.tuck.toFixed(2)}`
 );
 
-for (let index = 23; index <= 32; index += 1) {
+for (let index = 31; index <= 40; index += 1) {
   motion = mapper.mapSample(createSample(index * 33, 0.98, 1, 0, {
     shoulderCenterY: 0.49,
     leftShoulder: joint(0.42, 0.49, -0.15),
@@ -91,14 +100,14 @@ assert.ok(
   `expected upper-body fallback crouch to provide tuck boost when legs are unavailable, got ${motion.tuck.toFixed(2)}`
 );
 
-for (let index = 33; index <= 42; index += 1) {
-  motion = mapper.mapSample(createSample(index * 33, 0.79));
+for (let index = 41; index <= 50; index += 1) {
+  motion = mapper.mapSample(createSample(index * 33, 0.86));
 }
 
-assert.ok(motion.tuck >= 0.75, `expected clear crouch to still register strongly, got ${motion.tuck.toFixed(2)}`);
+assert.ok(motion.tuck >= 0.55, `expected clear crouch to register with relaxed thresholds, got ${motion.tuck.toFixed(2)}`);
 
-for (let index = 43; index <= 343; index += 1) {
-  motion = mapper.mapSample(createSample(index * 33, 0.79));
+for (let index = 51; index <= 351; index += 1) {
+  motion = mapper.mapSample(createSample(index * 33, 0.86));
 }
 
 assert.ok(
