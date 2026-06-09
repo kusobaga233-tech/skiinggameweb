@@ -2,6 +2,9 @@ import type { MotionState, PoseSample } from "./types";
 
 export interface MotionMapperConfig {
   steerGain: number;
+  steerDeadzone: number;
+  steerCurveExponent: number;
+  steerBaselineAlpha: number;
   steerAlpha: number;
   tuckAlpha: number;
   brakeAlpha: number;
@@ -30,11 +33,20 @@ export interface MotionMapperConfig {
   pumpMaxHits: number;
   pumpLockDurationMs: number;
   firstPumpDrive: number;
+  polePlantSteerGain: number;
+  polePlantDropStartThreshold: number;
+  polePlantBackStartThreshold: number;
+  snowplowSteerStartThreshold: number;
+  snowplowPoleStartThreshold: number;
+  snowplowAlpha: number;
 }
 
 const DEFAULT_CONFIG: MotionMapperConfig = {
-  steerGain: 6,
-  steerAlpha: 0.25,
+  steerGain: 5.1,
+  steerDeadzone: 0.04,
+  steerCurveExponent: 1.8,
+  steerBaselineAlpha: 0.06,
+  steerAlpha: 0.29,
   tuckAlpha: 0.5,
   brakeAlpha: 0.38,
   brakeDecayAlpha: 0.58,
@@ -61,7 +73,13 @@ const DEFAULT_CONFIG: MotionMapperConfig = {
   pumpWindowMs: 1500,
   pumpMaxHits: 2,
   pumpLockDurationMs: 10000,
-  firstPumpDrive: 0.72
+  firstPumpDrive: 0.72,
+  polePlantSteerGain: 1.45,
+  polePlantDropStartThreshold: 0.24,
+  polePlantBackStartThreshold: 0.14,
+  snowplowSteerStartThreshold: 0.22,
+  snowplowPoleStartThreshold: 0.2,
+  snowplowAlpha: 0.5
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -78,10 +96,13 @@ export class MotionMapper {
   private lastJumpMs = -10000;
   private lastPumpMs = -10000;
   private steerSmoothed = 0;
+  private snowplowSmoothed = 0;
   private tuckSmoothed = 0;
   private brakeSmoothed = 0;
   private driveSmoothed = 0;
   private baselineKneeRatio = 1;
+  private baselineTorsoSpan = 0;
+  private baselineLeanOffset = 0;
   private pumpLoaded = false;
   private recentPumpHits: number[] = [];
   private boostLockedUntilMs = -1;
@@ -97,12 +118,14 @@ export class MotionMapper {
 
     if (sample.confidence < this.config.minConfidence) {
       this.steerSmoothed = ema(this.steerSmoothed, 0, this.config.neutralDecayAlpha);
+      this.snowplowSmoothed = ema(this.snowplowSmoothed, 0, this.config.neutralDecayAlpha);
       this.tuckSmoothed = ema(this.tuckSmoothed, 0, this.config.neutralDecayAlpha);
       this.brakeSmoothed = ema(this.brakeSmoothed, 0, this.config.brakeDecayAlpha);
       this.recentPumpHits = lockActive ? this.recentPumpHits : this.prunePumpHits(sample.timestampMs);
       this.driveSmoothed = lockActive ? 1 : ema(this.driveSmoothed, 0, this.config.driveDecayAlpha);
       return {
         steer: this.steerSmoothed,
+        snowplow: this.snowplowSmoothed,
         tuck: this.tuckSmoothed,
         brake: this.brakeSmoothed,
         jumpTriggered: false,
@@ -118,28 +141,54 @@ export class MotionMapper {
       };
     }
 
-    const lean = sample.shoulderCenterX - sample.hipCenterX;
-    const steerRaw = clamp(lean * this.config.steerGain, -1, 1);
+    const shoulderSpan = Math.max(Math.abs(sample.rightShoulder.x - sample.leftShoulder.x), 1e-4);
+    const lean = (sample.shoulderCenterX - sample.hipCenterX) / shoulderSpan;
+    this.updateLeanBaseline(lean, lockActive);
+    const leanDelta = lean - this.baselineLeanOffset;
+    const deadzonedLean = Math.abs(leanDelta) <= this.config.steerDeadzone
+      ? 0
+      : leanDelta - Math.sign(leanDelta) * this.config.steerDeadzone;
+    const steerMagnitude = clamp(Math.abs(deadzonedLean) * this.config.steerGain, 0, 1);
+    const steerCurvedMagnitude = Math.pow(steerMagnitude, Math.max(this.config.steerCurveExponent, 1));
+    const steerRaw = Math.sign(deadzonedLean) * steerCurvedMagnitude;
+    const snowplowRaw = 0;
     this.steerSmoothed = ema(this.steerSmoothed, steerRaw, this.config.steerAlpha);
+    this.snowplowSmoothed = ema(this.snowplowSmoothed, snowplowRaw, this.config.snowplowAlpha);
 
     const legTracking = sample.legConfidence >= this.config.minConfidence;
-    let normalizedKnee = 1;
+    let tuckRaw = 0;
     if (legTracking) {
-      normalizedKnee = clamp(sample.kneeRatio / Math.max(this.baselineKneeRatio, 1e-5), 0.5, 1.08);
+      const normalizedKnee = clamp(sample.kneeRatio / Math.max(this.baselineKneeRatio, 1e-5), 0.5, 1.08);
       const tuckStartThreshold = 0.92;
       const tuckFullThreshold = 0.79;
-      const tuckRaw = clamp(
+      tuckRaw = clamp(
         (tuckStartThreshold - normalizedKnee) / Math.max(tuckStartThreshold - tuckFullThreshold, 1e-5),
         0,
         1
       );
-      this.tuckSmoothed = ema(this.tuckSmoothed, tuckRaw, this.config.tuckAlpha);
+    } else if (sample.confidence >= this.config.minConfidence) {
+      const torsoSpan = Math.max(sample.hipCenterY - sample.shoulderCenterY, 1e-4);
+      const normalizedTorsoSpan = clamp(torsoSpan / Math.max(this.baselineTorsoSpan, 1e-5), 0.45, 1.1);
+      const torsoTuckStartThreshold = 0.88;
+      const torsoTuckFullThreshold = 0.62;
+      tuckRaw = clamp(
+        (torsoTuckStartThreshold - normalizedTorsoSpan)
+          / Math.max(torsoTuckStartThreshold - torsoTuckFullThreshold, 1e-5),
+        0,
+        1
+      );
+      tuckRaw *= 0.78;
     } else {
-      this.tuckSmoothed = ema(this.tuckSmoothed, 0, this.config.neutralDecayAlpha);
       this.previousKneeRatio = null;
     }
 
-    const brakeRaw = this.evaluateBrakeRaw(sample, normalizedKnee, legTracking);
+    this.tuckSmoothed = ema(
+      this.tuckSmoothed,
+      tuckRaw,
+      tuckRaw > this.tuckSmoothed ? this.config.tuckAlpha : this.config.neutralDecayAlpha
+    );
+
+    const brakeRaw = 0;
     this.brakeSmoothed = ema(
       this.brakeSmoothed,
       brakeRaw,
@@ -166,27 +215,16 @@ export class MotionMapper {
       );
     }
 
-    let jump = false;
-    if (legTracking && this.previousKneeRatio !== null) {
-      const previousNormalized = clamp(this.previousKneeRatio / Math.max(this.baselineKneeRatio, 1e-5), 0.4, 1.1);
-      const riseVelocity = (normalizedKnee - previousNormalized) / Math.max(sample.dt, 1e-5);
-      const cooldownOk = sample.timestampMs - this.lastJumpMs >= this.config.jumpCooldownMs;
-      const wasCrouched = previousNormalized < this.config.crouchThreshold;
-      const nowStanding = normalizedKnee > this.config.standThreshold;
-      jump = cooldownOk && wasCrouched && nowStanding && riseVelocity > this.config.jumpVelocityThreshold;
-    }
-
-    if (jump) {
-      this.lastJumpMs = sample.timestampMs;
-    }
+    const jump = false;
 
     this.previousKneeRatio = legTracking ? sample.kneeRatio : null;
 
     return {
       steer: this.steerSmoothed,
+      snowplow: this.snowplowSmoothed,
       tuck: this.tuckSmoothed,
       brake: this.brakeSmoothed,
-      jumpTriggered: jump,
+      jumpTriggered: false,
       pumpTriggered,
       drive: this.driveSmoothed,
       pumpActive: boostLockActive || pumpHits > 0,
@@ -266,12 +304,68 @@ export class MotionMapper {
     return clamp(forwardReach * 4.6 + elbowReach * 2.2 - wristDrop * 1.8, -1.2, 1.2);
   }
 
+  private evaluatePolePlantSteer(sample: PoseSample): number {
+    if (sample.armConfidence < this.config.minArmConfidence) {
+      return 0;
+    }
+
+    const leftPlant = this.polePlantSignal(sample.leftShoulder, sample.leftElbow, sample.leftWrist);
+    const rightPlant = this.polePlantSignal(sample.rightShoulder, sample.rightElbow, sample.rightWrist);
+    return clamp((rightPlant - leftPlant) * this.config.polePlantSteerGain, -1, 1);
+  }
+
+  private evaluateDirectionalSnowplow(steerRaw: number, polePlantDirection: number): number {
+    const steerMagnitude = Math.abs(steerRaw);
+    const poleMagnitude = Math.abs(polePlantDirection);
+    if (
+      steerMagnitude < this.config.snowplowSteerStartThreshold
+      || poleMagnitude < this.config.snowplowPoleStartThreshold
+      || Math.sign(steerRaw) !== Math.sign(polePlantDirection)
+    ) {
+      return 0;
+    }
+
+    const steerFactor = this.inverseLerp(this.config.snowplowSteerStartThreshold, 0.68, steerMagnitude);
+    const poleFactor = this.inverseLerp(this.config.snowplowPoleStartThreshold, 0.68, poleMagnitude);
+    return Math.sign(steerRaw) * clamp(Math.min(steerFactor, poleFactor), 0, 1);
+  }
+
+  private polePlantSignal(
+    shoulder: PoseSample["leftShoulder"],
+    elbow: PoseSample["leftElbow"],
+    wrist: PoseSample["leftWrist"]
+  ): number {
+    if (!shoulder.visible || !elbow.visible || !wrist.visible) {
+      return 0;
+    }
+
+    const wristDrop = wrist.y - shoulder.y;
+    const wristBackReach = wrist.z - shoulder.z;
+    const elbowDrop = elbow.y - shoulder.y;
+    const dropSignal = this.inverseLerp(this.config.polePlantDropStartThreshold, 0.42, wristDrop);
+    const backSignal = this.inverseLerp(this.config.polePlantBackStartThreshold, 0.26, wristBackReach);
+    const elbowSignal = this.inverseLerp(0.12, 0.24, elbowDrop);
+    const plantCommitment = backSignal * 0.78 + elbowSignal * 0.22;
+    return clamp(Math.min(dropSignal, plantCommitment), 0, 1);
+  }
+
   private prunePumpHits(nowMs: number): number[] {
     return this.recentPumpHits.filter((timestamp) => nowMs - timestamp <= this.config.pumpWindowMs);
   }
 
   private updateBaseline(sample: PoseSample): void {
-    if (sample.confidence < this.config.minConfidence || sample.legConfidence < this.config.minConfidence) {
+    if (sample.confidence < this.config.minConfidence) {
+      return;
+    }
+
+    const torsoSpan = Math.max(sample.hipCenterY - sample.shoulderCenterY, 1e-4);
+    if (this.baselineTorsoSpan <= 0) {
+      this.baselineTorsoSpan = torsoSpan;
+    } else {
+      this.baselineTorsoSpan = Math.max(this.baselineTorsoSpan, torsoSpan);
+    }
+
+    if (sample.legConfidence < this.config.minConfidence) {
       return;
     }
 
@@ -280,8 +374,19 @@ export class MotionMapper {
       return;
     }
 
-    const decayed = this.baselineKneeRatio * 0.999;
-    this.baselineKneeRatio = Math.max(decayed, sample.kneeRatio);
+    this.baselineKneeRatio = Math.max(this.baselineKneeRatio, sample.kneeRatio);
+  }
+
+  private updateLeanBaseline(lean: number, lockActive: boolean): void {
+    if (lockActive) {
+      return;
+    }
+
+    if (Math.abs(this.steerSmoothed) > 0.12 || this.tuckSmoothed > 0.18 || this.pumpLoaded || this.recentPumpHits.length > 0) {
+      return;
+    }
+
+    this.baselineLeanOffset = ema(this.baselineLeanOffset, lean, this.config.steerBaselineAlpha);
   }
 
   private evaluateBrakeRaw(sample: PoseSample, normalizedKnee: number, legTracking: boolean): number {

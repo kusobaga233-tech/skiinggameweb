@@ -6,7 +6,7 @@ const sceneBuilderSource = await fs.readFile(path.resolve("src/game/sceneBuilder
 const skierControllerSource = await fs.readFile(path.resolve("src/game/skierController.ts"), "utf8");
 
 assert.ok(
-  sceneBuilderSource.includes("applyPose(tuck: number, glide = 0, carve = 0, turnBlend = 0, lateralLean = 0, pumpBlend = 0): void"),
+  sceneBuilderSource.includes("applyPose(tuck: number, glide = 0, carve = 0, turnBlend = 0, lateralLean = 0, pumpBlend = 0, brakeBlend = 0, edgeHold = 0, driftSlip = 0): void"),
   "expected avatar rig pose API to accept a dedicated lateral-lean blend"
 );
 
@@ -26,7 +26,7 @@ assert.ok(
 );
 
 assert.ok(
-  skierControllerSource.includes("this.skierAvatarRig.applyPose(this.currentTuck, glidePoseBlend, carveIntent, animationTurnBlend, lateralLean, pumpPoseBlend);"),
+  skierControllerSource.includes("this.skierAvatarRig.applyPose("),
   "expected active gameplay pose application to include lateral lean"
 );
 

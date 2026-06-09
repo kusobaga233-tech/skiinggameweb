@@ -3,6 +3,7 @@ import type { TrackCourse } from "../game/trackCourse";
 
 export class MiniMap {
   private readonly context: CanvasRenderingContext2D;
+  private readonly trackPath: HTMLCanvasElement;
   private readonly minX: number;
   private readonly maxX: number;
   private readonly minZ: number;
@@ -36,19 +37,43 @@ export class MiniMap {
     this.maxX = maxX + course.courseHalfWidth * 1.35;
     this.minZ = minZ;
     this.maxZ = maxZ;
+    this.trackPath = this.createTrackPathLayer();
   }
 
   render(state: HudState): void {
     const { width, height } = this.canvas;
     const ctx = this.context;
     ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(this.trackPath, 0, 0, width, height);
+
+    const player = this.project(state.playerX, state.playerZ);
+    ctx.fillStyle = "#2f80ff";
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, 8.5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  private createTrackPathLayer(): HTMLCanvasElement {
+    const layer = document.createElement("canvas");
+    layer.width = this.canvas.width;
+    layer.height = this.canvas.height;
+    const ctx = layer.getContext("2d");
+    if (!ctx) {
+      throw new Error("Mini map track layer context unavailable");
+    }
 
     ctx.fillStyle = "#07101a";
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, layer.width, layer.height);
 
     ctx.strokeStyle = "rgba(255,255,255,0.08)";
     ctx.lineWidth = 1;
-    ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+    ctx.strokeRect(0.5, 0.5, layer.width - 1, layer.height - 1);
 
     ctx.strokeStyle = "rgba(237, 244, 255, 0.92)";
     ctx.lineWidth = 2;
@@ -63,17 +88,7 @@ export class MiniMap {
     });
     ctx.stroke();
 
-    const player = this.project(state.playerX, state.playerZ);
-    ctx.fillStyle = "#2f80ff";
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, 5.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = "rgba(255,255,255,0.85)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, 8.5, 0, Math.PI * 2);
-    ctx.stroke();
+    return layer;
   }
 
   private project(x: number, z: number): { x: number; y: number } {

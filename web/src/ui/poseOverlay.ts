@@ -51,9 +51,11 @@ export class PoseOverlay {
         continue;
       }
 
+      const startPoint = this.mapLandmarkToCanvas(start.x, start.y);
+      const endPoint = this.mapLandmarkToCanvas(end.x, end.y);
       context.beginPath();
-      context.moveTo(start.x * this.canvas.width, start.y * this.canvas.height);
-      context.lineTo(end.x * this.canvas.width, end.y * this.canvas.height);
+      context.moveTo(startPoint.x, startPoint.y);
+      context.lineTo(endPoint.x, endPoint.y);
       context.stroke();
     }
 
@@ -62,10 +64,11 @@ export class PoseOverlay {
         continue;
       }
 
+      const point = this.mapLandmarkToCanvas(landmark.x, landmark.y);
       context.beginPath();
       context.arc(
-        landmark.x * this.canvas.width,
-        landmark.y * this.canvas.height,
+        point.x,
+        point.y,
         4.5,
         0,
         Math.PI * 2
@@ -86,5 +89,26 @@ export class PoseOverlay {
       this.canvas.width = width;
       this.canvas.height = height;
     }
+  }
+
+  private mapLandmarkToCanvas(x: number, y: number): { x: number; y: number } {
+    const canvasWidth = this.canvas.width;
+    const canvasHeight = this.canvas.height;
+    const videoWidth = this.video.videoWidth || canvasWidth;
+    const videoHeight = this.video.videoHeight || canvasHeight;
+    const videoAspect = videoWidth / Math.max(videoHeight, 1);
+    const canvasAspect = canvasWidth / Math.max(canvasHeight, 1);
+    const scale = canvasAspect > videoAspect
+      ? canvasWidth / Math.max(videoWidth, 1)
+      : canvasHeight / Math.max(videoHeight, 1);
+    const drawnWidth = videoWidth * scale;
+    const drawnHeight = videoHeight * scale;
+    const offsetX = (canvasWidth - drawnWidth) * 0.5;
+    const offsetY = (canvasHeight - drawnHeight) * 0.5;
+
+    return {
+      x: offsetX + x * drawnWidth,
+      y: offsetY + y * drawnHeight
+    };
   }
 }

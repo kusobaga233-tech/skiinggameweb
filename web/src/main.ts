@@ -10,6 +10,10 @@ import { ControlPanel } from "./ui/controlPanel";
 import { Hud } from "./ui/hud";
 import { MiniMap } from "./ui/miniMap";
 import { PoseOverlay } from "./ui/poseOverlay";
+import { SpeedMeter } from "./ui/speedMeter";
+import { StartBoostMeter } from "./ui/startBoostMeter";
+import { loadRuntimeConfig } from "./config/runtimeConfig";
+import type { TrackCourseId } from "./game/trackCourse";
 
 function requiredElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -27,6 +31,12 @@ const hudOutput = requiredElement<HTMLElement>("hud-output");
 const poseStatus = requiredElement<HTMLElement>("pose-status");
 const boostTutorialShell = requiredElement<HTMLElement>("boost-tutorial-shell");
 const boostTutorialVideoElement = requiredElement<HTMLVideoElement>("boost-tutorial-video");
+const startBoostShell = requiredElement<HTMLElement>("start-boost-shell");
+const startBoostFill = requiredElement<HTMLElement>("start-boost-fill");
+const startBoostValue = requiredElement<HTMLElement>("start-boost-value");
+const speedMeterShell = requiredElement<HTMLElement>("speed-meter");
+const speedMeterValue = requiredElement<HTMLElement>("speed-meter-value");
+const speedMeterBar = requiredElement<HTMLElement>("speed-meter-bar");
 const cameraSelect = requiredElement<HTMLSelectElement>("camera-select");
 const cameraStatus = requiredElement<HTMLElement>("camera-status");
 const refreshButton = requiredElement<HTMLButtonElement>("refresh-cameras");
@@ -34,17 +44,23 @@ const applyButton = requiredElement<HTMLButtonElement>("apply-camera");
 const restartButton = requiredElement<HTMLButtonElement>("restart-run");
 const pauseButton = requiredElement<HTMLButtonElement>("toggle-pause");
 const meshPickOutput = requiredElement<HTMLElement>("mesh-pick-output");
+const track1Button = requiredElement<HTMLButtonElement>("track-1-button");
+const track2Button = requiredElement<HTMLButtonElement>("track-2-button");
 
 const cameraManager = new CameraManager(video);
 const fallback = new KeyboardFallback();
 const hud = new Hud(hudOutput, poseStatus);
 const boostTutorialVideo = new BoostTutorialVideo(boostTutorialShell, boostTutorialVideoElement);
+const startBoostMeter = new StartBoostMeter(startBoostShell, startBoostFill, startBoostValue);
+const speedMeter = new SpeedMeter(speedMeterShell, speedMeterValue, speedMeterBar);
 const controlPanel = new ControlPanel(cameraSelect, cameraStatus);
 const poseOverlay = new PoseOverlay(poseOverlayCanvas, video);
 const selectedCameraStorageKey = "skiiing.web.selectedCamera";
+const selectedTrackStorageKey = "skiiing.web.selectedTrack";
 
 let latestPoseMotion: MotionState = {
   steer: 0,
+  snowplow: 0,
   tuck: 0,
   brake: 0,
   jumpTriggered: false,
@@ -65,6 +81,17 @@ let gameAppPromise: Promise<GameApp> | null = null;
 let poseRuntime: PoseRuntime | null = null;
 let poseRuntimePromise: Promise<PoseRuntime> | null = null;
 let miniMap: MiniMap | null = null;
+let selectedTrackId: TrackCourseId = loadStoredTrackId();
+
+function loadStoredTrackId(): TrackCourseId {
+  const stored = localStorage.getItem(selectedTrackStorageKey);
+  return stored === "track2" ? "track2" : "track1";
+}
+
+function syncTrackButtons(trackId: TrackCourseId): void {
+  track1Button.classList.toggle("is-active", trackId === "track1");
+  track2Button.classList.toggle("is-active", trackId === "track2");
+}
 
 function syncPauseUi(paused: boolean, pickedText?: string): void {
   pauseButton.textContent = getPauseToggleLabel(paused);
@@ -84,14 +111,45 @@ async function ensureGameApp(): Promise<GameApp> {
   }
 
   if (!gameAppPromise) {
-    gameAppPromise = import("./game/gameApp")
-      .then(({ GameApp: GameAppModule }) => {
-        const app = new GameAppModule(canvas);
+    gameAppPromise = Promise.all([
+      import("./game/gameApp"),
+      loadRuntimeConfig()
+    ])
+      .then(([{ GameApp: GameAppModule }, runtimeConfig]) => {
+        speedMeter.setMaxSpeed(runtimeConfig.maxForwardSpeed);
+        const app = new GameAppModule(canvas, selectedTrackId, {
+          poseSteerScale: runtimeConfig.bodySteerGameplayScale,
+          maxForwardSpeed: runtimeConfig.maxForwardSpeed,
+          downhillSpeedBoost: runtimeConfig.downhillSpeedBoost,
+          accelerationResponse: runtimeConfig.accelerationResponse,
+          driveSpeedBoost: runtimeConfig.driveSpeedBoost,
+          driveDownhillSynergy: runtimeConfig.driveDownhillSynergy,
+          maxTuckSpeedBonusRatio: runtimeConfig.maxTuckSpeedBonusRatio,
+          startSpeedLimit: runtimeConfig.startSpeedLimit,
+          pumpImpulseBoost: runtimeConfig.pumpImpulseBoost,
+          carveRadiusMin: runtimeConfig.carveRadiusMin,
+          carveRadiusMax: runtimeConfig.carveRadiusMax,
+          lowSpeedTurnScale: runtimeConfig.lowSpeedTurnScale,
+          carveRadiusInputBias: runtimeConfig.carveRadiusInputBias,
+          carveRadiusInputFloor: runtimeConfig.carveRadiusInputFloor,
+          turnSnowplowSteerStart: runtimeConfig.turnSnowplowSteerStart,
+          turnSnowplowSteerRelease: runtimeConfig.turnSnowplowSteerRelease,
+          turnSnowplowSteerFull: runtimeConfig.turnSnowplowSteerFull,
+          turnSnowplowHoldDuration: runtimeConfig.turnSnowplowHoldDuration,
+          turnSnowplowReleaseDuration: runtimeConfig.turnSnowplowReleaseDuration,
+          turnSnowplowMinSpeed: runtimeConfig.turnSnowplowMinSpeed,
+          turnSnowplowMaxBlend: runtimeConfig.turnSnowplowMaxBlend,
+          turnSnowplowSpeedReduction: runtimeConfig.turnSnowplowSpeedReduction,
+          snowplowStopResponseMin: runtimeConfig.snowplowStopResponseMin,
+          snowplowStopResponseMax: runtimeConfig.snowplowStopResponseMax
+        });
         miniMap = new MiniMap(miniMapCanvas, app.getCourse());
         app.start((hudState) => {
           app.setMotionState(currentMotion());
           hud.render(hudState);
+          speedMeter.render(hudState.speed);
           boostTutorialVideo.render(hudState.motion);
+          startBoostMeter.render(hudState);
           miniMap?.render(hudState);
         });
         app.setCameraLabel(currentCameraLabel);
@@ -109,14 +167,38 @@ async function ensureGameApp(): Promise<GameApp> {
   return gameAppPromise;
 }
 
+async function rebuildGameApp(trackId: TrackCourseId): Promise<GameApp> {
+  gameApp?.dispose();
+  gameApp = null;
+  gameAppPromise = null;
+  miniMap = null;
+  selectedTrackId = trackId;
+  localStorage.setItem(selectedTrackStorageKey, trackId);
+  syncTrackButtons(trackId);
+  const app = await ensureGameApp();
+  app.setCameraLabel(currentCameraLabel);
+  syncPauseUi(app.isPaused());
+  return app;
+}
+
 async function ensurePoseRuntime(): Promise<PoseRuntime> {
   if (poseRuntime) {
     return poseRuntime;
   }
 
   if (!poseRuntimePromise) {
-    poseRuntimePromise = import("./pose/poseRuntime").then(({ PoseRuntime: PoseRuntimeModule }) => {
-      poseRuntime = new PoseRuntimeModule();
+    poseRuntimePromise = Promise.all([
+      import("./pose/poseRuntime"),
+      loadRuntimeConfig()
+    ]).then(([{ PoseRuntime: PoseRuntimeModule }, runtimeConfig]) => {
+      poseRuntime = new PoseRuntimeModule({
+        motionMapper: {
+          steerGain: runtimeConfig.bodySteerGain,
+          steerDeadzone: runtimeConfig.bodySteerDeadzone,
+          steerAlpha: runtimeConfig.bodySteerAlpha,
+          steerCurveExponent: runtimeConfig.bodySteerCurveExponent
+        }
+      });
       return poseRuntime;
     });
   }
@@ -127,7 +209,7 @@ async function ensurePoseRuntime(): Promise<PoseRuntime> {
 function currentMotion(): MotionState {
   if (latestPoseMotion.tracking && latestPoseMotion.confidence >= 0.6) {
     const motion = latestPoseMotion;
-    latestPoseMotion = { ...latestPoseMotion, jumpTriggered: false, pumpTriggered: false };
+    latestPoseMotion = { ...latestPoseMotion, pumpTriggered: false };
     return motion;
   }
 
@@ -200,7 +282,7 @@ async function startCameraAndPose(preferredDeviceId: string | null = selectedDev
       latestPoseMotion = motion;
     },
     (status) => {
-      app.setPoseStatus(status.message, status.fps, status.inferenceMs);
+      gameApp?.setPoseStatus(status.message, status.fps, status.inferenceMs);
     },
     (overlayFrame) => {
       poseOverlay.draw(overlayFrame);
@@ -234,8 +316,24 @@ applyButton.addEventListener("click", async () => {
   }
 });
 
-restartButton.addEventListener("click", () => {
+  restartButton.addEventListener("click", () => {
   gameApp?.restart();
+});
+
+track1Button.addEventListener("click", async () => {
+  if (selectedTrackId === "track1" && gameApp) {
+    return;
+  }
+
+  await rebuildGameApp("track1");
+});
+
+track2Button.addEventListener("click", async () => {
+  if (selectedTrackId === "track2" && gameApp) {
+    return;
+  }
+
+  await rebuildGameApp("track2");
 });
 
 pauseButton.addEventListener("click", async () => {
@@ -258,6 +356,7 @@ canvas.addEventListener("click", async (event) => {
 });
 
 void (async () => {
+  syncTrackButtons(selectedTrackId);
   const app = await ensureGameApp();
   syncPauseUi(app.isPaused());
   try {

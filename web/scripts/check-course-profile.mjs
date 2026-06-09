@@ -19,146 +19,75 @@ const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "skiiing-course-check-")
 const compiledPath = path.join(tempDir, "trackCourse.mjs");
 await fs.writeFile(compiledPath, transpiled.outputText, "utf8");
 
-const { evaluateCourseCenterX, evaluateCourseTangent, createTrackCourse } = await import(pathToFileURL(compiledPath).href);
-
-const checkpoints = [
-  { z: 220, direction: "left", minMagnitude: 4.7 },
-  { z: 520, direction: "right", minMagnitude: 6.8 },
-  { z: 760, direction: "left", minMagnitude: 4.7 },
-  { z: 930, direction: "right", minMagnitude: 5.0 },
-  { z: 1085, direction: "left", minMagnitude: 15 },
-  { z: 1470, direction: "right", minMagnitude: 4.0 },
-  { z: 1650, direction: "right", minMagnitude: 1.0 },
-  { z: 1830, direction: "right", minMagnitude: 10 },
-  { z: 2010, direction: "right", minMagnitude: 10.5 },
-  { z: 2200, direction: "left", minMagnitude: 0.6 },
-  { z: 2330, direction: "right", minMagnitude: 0.6 },
-  { z: 2460, direction: "right", minMagnitude: 0.8 }
-];
-
-const results = checkpoints.map((checkpoint) => {
-  const value = evaluateCourseCenterX(checkpoint.z);
-  const signedMagnitude = checkpoint.direction === "left" ? -value : value;
-
-  assert.ok(
-    signedMagnitude >= checkpoint.minMagnitude,
-    `${checkpoint.direction} turn too weak at z=${checkpoint.z}: expected >= ${checkpoint.minMagnitude.toFixed(1)}, got ${value.toFixed(2)}`
-  );
-
-  return {
-    ...checkpoint,
-    value: Number(value.toFixed(2))
-  };
-});
-
-console.log("Course bend profile OK");
-console.table(results);
+const {
+  createTrackCourse,
+  evaluateCourseCenterX,
+  evaluateCourseElevation,
+  evaluateCourseTangent
+} = await import(pathToFileURL(compiledPath).href);
 
 const course = createTrackCourse();
-assert.equal(course.gates.length, 23, `expected 23 gates after 50% density reduction, got ${course.gates.length}`);
-assert.equal(course.turnMarkers?.length, 12, `expected 12 turn markers, got ${course.turnMarkers?.length ?? "none"}`);
-assert.equal(course.ramps.length, 11, `expected 11 ramps after adding 2 track-wide jumps, got ${course.ramps.length}`);
 
-const trackWideRamps = course.ramps.filter((ramp) => ramp.kind === "large" && ramp.halfWidth >= course.courseHalfWidth - 0.6);
-assert.equal(trackWideRamps.length, 2, `expected 2 track-wide large ramps, got ${trackWideRamps.length}`);
-
-for (const ramp of trackWideRamps) {
-  assert.ok(
-    Math.abs(ramp.centerX - evaluateCourseCenterX(ramp.centerZ)) <= 0.01,
-    `expected track-wide ramp ${ramp.index} to stay centered on course at z=${ramp.centerZ}`
-  );
-}
-
-for (let index = 0; index < course.turnMarkers.length; index += 1) {
-  const marker = course.turnMarkers[index];
-  assert.equal(marker.index, index + 1, `expected turn marker index ${index + 1}, got ${marker.index}`);
-}
+assert.equal(course.length, 2600, `expected course length to remain 2600, got ${course.length}`);
+assert.equal(course.gates.length, 18, `expected 18 gates on spiral course, got ${course.gates.length}`);
+assert.equal(course.ramps.length, 11, `expected existing 11 ramps to remain, got ${course.ramps.length}`);
+assert.ok(course.turnMarkers.length >= 9, `expected spiral turn markers to be rebuilt, got ${course.turnMarkers.length}`);
 
 for (let index = 1; index < course.gates.length; index += 1) {
   const spacing = course.gates[index].z - course.gates[index - 1].z;
-  assert.equal(spacing, 84, `expected gate spacing 84 at pair ${index}, got ${spacing}`);
+  assert.equal(spacing, 140, `expected gate spacing 140 at pair ${index}, got ${spacing}`);
 }
 
-console.log("Course gate density OK");
-console.log("Track-wide jump ramps OK");
-console.table(
-  trackWideRamps.map((ramp) => ({
-    index: ramp.index,
-    centerZ: ramp.centerZ,
-    width: Number((ramp.halfWidth * 2).toFixed(2)),
-    courseWidth: Number((course.courseHalfWidth * 2).toFixed(2))
-  }))
-);
-
-function gateAtZ(z) {
-  const gate = course.gates.find((item) => item.z === z);
-  assert.ok(gate, `expected gate at z=${z}`);
-  return gate;
+for (const gate of course.gates) {
+  const centerX = evaluateCourseCenterX(gate.z);
+  assert.ok(
+    Math.abs(gate.centerX - centerX) <= course.courseHalfWidth - gate.halfWidth,
+    `expected gate ${gate.index} to stay inside spiral lane`
+  );
+  assert.equal(gate.halfWidth, 2.9, `expected widened spiral gate ${gate.index}, got ${gate.halfWidth}`);
 }
 
-function gateOffsetAtZ(z) {
-  const gate = gateAtZ(z);
-  return Number((gate.centerX - evaluateCourseCenterX(z)).toFixed(2));
-}
+const startY = evaluateCourseElevation(0);
+const earlyY = evaluateCourseElevation(360);
+const finishY = evaluateCourseElevation(course.length);
+assert.ok(earlyY < startY - 45, `expected immediate downhill spiral, start=${startY.toFixed(1)} early=${earlyY.toFixed(1)}`);
+assert.ok(finishY < startY - 430, `expected downhill spiral to keep descending, start=${startY.toFixed(1)} finish=${finishY.toFixed(1)}`);
 
-const turnAGates = {
-  entry: gateOffsetAtZ(950),
-  apex: gateOffsetAtZ(1034),
-  exit: gateOffsetAtZ(1202)
-};
+const startSlope = evaluateCourseTangent(40).y;
+const downhillSlope = evaluateCourseTangent(1500).y;
+assert.ok(startSlope < -0.04, `expected start course to be downhill, got ${startSlope.toFixed(3)}`);
+assert.ok(downhillSlope < -0.08, `expected late course to be downhill, got ${downhillSlope.toFixed(3)}`);
 
-assert.ok(turnAGates.entry >= 3.5, `expected left major turn entry gate to guide outside-right, got ${turnAGates.entry}`);
-assert.ok(turnAGates.apex <= -3.5, `expected left major turn apex gate to guide inside-left, got ${turnAGates.apex}`);
-assert.ok(turnAGates.exit >= 2.8, `expected left major turn exit gate to reopen to outside-right, got ${turnAGates.exit}`);
-
-const turnBGates = {
-  entry: gateOffsetAtZ(1286),
-  apex: gateOffsetAtZ(1370),
-  exit: gateOffsetAtZ(1538)
-};
-
-assert.ok(turnBGates.entry <= -3.5, `expected right major turn entry gate to guide outside-left, got ${turnBGates.entry}`);
-assert.ok(turnBGates.apex >= 3.5, `expected right major turn apex gate to guide inside-right, got ${turnBGates.apex}`);
-assert.ok(turnBGates.exit <= -2.8, `expected right major turn exit gate to reopen to outside-left, got ${turnBGates.exit}`);
-
-console.log("Gate line guidance OK");
-console.table([
-  { turn: "turnA-entry", offset: turnAGates.entry },
-  { turn: "turnA-apex", offset: turnAGates.apex },
-  { turn: "turnA-exit", offset: turnAGates.exit },
-  { turn: "turnB-entry", offset: turnBGates.entry },
-  { turn: "turnB-apex", offset: turnBGates.apex },
-  { turn: "turnB-exit", offset: turnBGates.exit }
-]);
-
-function maxTurnAngleDegrees(start, end) {
-  let maxDegrees = 0;
-  for (let z = start; z <= end; z += 1) {
-    const tangent = evaluateCourseTangent(z);
-    const degrees = Math.atan2(Math.abs(tangent.x), tangent.z) * 180 / Math.PI;
-    if (degrees > maxDegrees) {
-      maxDegrees = degrees;
-    }
+let signChanges = 0;
+let previousSign = 0;
+let maxAbsX = 0;
+for (let z = 0; z <= course.length; z += 130) {
+  const centerX = evaluateCourseCenterX(z);
+  maxAbsX = Math.max(maxAbsX, Math.abs(centerX));
+  const sign = Math.sign(centerX);
+  if (sign !== 0 && previousSign !== 0 && sign !== previousSign) {
+    signChanges += 1;
   }
-  return Number(maxDegrees.toFixed(2));
+  if (sign !== 0) {
+    previousSign = sign;
+  }
 }
 
-const majorTurnA = maxTurnAngleDegrees(978, 1137);
-const majorTurnB = maxTurnAngleDegrees(1318, 1492);
-const majorTurnC = maxTurnAngleDegrees(2138, 2262);
-const majorTurnD = maxTurnAngleDegrees(2268, 2392);
-const majorTurnE = maxTurnAngleDegrees(2398, 2522);
-assert.ok(majorTurnA >= 12 && majorTurnA <= 18, `expected first long-arc bend in GS-style range, got ${majorTurnA}`);
-assert.ok(majorTurnB >= 13 && majorTurnB <= 20, `expected second long-arc bend in GS-style range, got ${majorTurnB}`);
-assert.ok(majorTurnC >= 9 && majorTurnC <= 14, `expected third tail bend in medium long-arc range, got ${majorTurnC}`);
-assert.ok(majorTurnD >= 10 && majorTurnD <= 15, `expected fourth tail bend in medium long-arc range, got ${majorTurnD}`);
-assert.ok(majorTurnE >= 10 && majorTurnE <= 15, `expected fifth tail bend in medium long-arc range, got ${majorTurnE}`);
+assert.ok(signChanges >= 5, `expected visible spiral oscillation, got ${signChanges} sign changes`);
+assert.ok(maxAbsX >= 13, `expected visible spiral radius, got max center offset ${maxAbsX.toFixed(2)}`);
 
-console.log("Major turn angle OK");
+const trackWideRamps = course.ramps.filter((ramp) => ramp.kind === "large" && ramp.halfWidth >= course.courseHalfWidth - 0.6);
+assert.equal(trackWideRamps.length, 2, `expected 2 track-wide large ramps, got ${trackWideRamps.length}`);
+for (const ramp of course.ramps.filter((item) => item.kind === "large")) {
+  assert.ok(
+    Math.abs(ramp.centerX - evaluateCourseCenterX(ramp.centerZ)) <= 0.01,
+    `expected large ramp ${ramp.index} to stay centered on spiral centerline`
+  );
+}
+
+console.log("Spiral course profile OK");
 console.table([
-  { label: "turnA", degrees: majorTurnA },
-  { label: "turnB", degrees: majorTurnB },
-  { label: "turnC", degrees: majorTurnC },
-  { label: "turnD", degrees: majorTurnD },
-  { label: "turnE", degrees: majorTurnE }
+  { label: "start", z: 0, x: Number(evaluateCourseCenterX(0).toFixed(2)), y: Number(startY.toFixed(2)) },
+  { label: "early-downhill", z: 360, x: Number(evaluateCourseCenterX(360).toFixed(2)), y: Number(earlyY.toFixed(2)) },
+  { label: "finish", z: course.length, x: Number(evaluateCourseCenterX(course.length).toFixed(2)), y: Number(finishY.toFixed(2)) }
 ]);

@@ -25,12 +25,14 @@ function joint(x, y, z, visible = true) {
   return { x, y, z, visible };
 }
 
-function createSample(timestampMs, kneeRatio, confidence = 1, legConfidence = confidence) {
+function createSample(timestampMs, kneeRatio, confidence = 1, legConfidence = confidence, overrides = {}) {
   return {
     timestampMs,
     dt: 1 / 30,
     hipCenterX: 0.5,
     shoulderCenterX: 0.5,
+    hipCenterY: 0.62,
+    shoulderCenterY: 0.38,
     kneeRatio,
     confidence,
     legConfidence,
@@ -40,7 +42,8 @@ function createSample(timestampMs, kneeRatio, confidence = 1, legConfidence = co
     leftElbow: joint(0.4, 0.49, -0.08),
     rightElbow: joint(0.6, 0.49, -0.08),
     leftWrist: joint(0.37, 0.57, -0.02),
-    rightWrist: joint(0.63, 0.57, -0.02)
+    rightWrist: joint(0.63, 0.57, -0.02),
+    ...overrides
   };
 }
 
@@ -68,13 +71,39 @@ for (let index = 15; index <= 22; index += 1) {
 
 assert.ok(
   motion.tuck <= 0.05,
-  `expected upper-body-only tracking to avoid tuck boost entirely, got ${motion.tuck.toFixed(2)}`
+  `expected upper-body-only neutral stance to avoid tuck boost, got ${motion.tuck.toFixed(2)}`
 );
 
 for (let index = 23; index <= 32; index += 1) {
+  motion = mapper.mapSample(createSample(index * 33, 0.98, 1, 0, {
+    shoulderCenterY: 0.49,
+    leftShoulder: joint(0.42, 0.49, -0.15),
+    rightShoulder: joint(0.58, 0.49, -0.15),
+    leftElbow: joint(0.4, 0.58, -0.08),
+    rightElbow: joint(0.6, 0.58, -0.08),
+    leftWrist: joint(0.37, 0.66, -0.02),
+    rightWrist: joint(0.63, 0.66, -0.02)
+  }));
+}
+
+assert.ok(
+  motion.tuck >= 0.35,
+  `expected upper-body fallback crouch to provide tuck boost when legs are unavailable, got ${motion.tuck.toFixed(2)}`
+);
+
+for (let index = 33; index <= 42; index += 1) {
   motion = mapper.mapSample(createSample(index * 33, 0.79));
 }
 
 assert.ok(motion.tuck >= 0.75, `expected clear crouch to still register strongly, got ${motion.tuck.toFixed(2)}`);
+
+for (let index = 43; index <= 343; index += 1) {
+  motion = mapper.mapSample(createSample(index * 33, 0.79));
+}
+
+assert.ok(
+  motion.tuck >= 0.7,
+  `expected sustained crouch to remain active instead of being absorbed into baseline, got ${motion.tuck.toFixed(2)}`
+);
 
 console.log("Tuck detection OK");

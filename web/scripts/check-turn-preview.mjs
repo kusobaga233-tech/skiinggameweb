@@ -29,41 +29,32 @@ const { evaluateTurnPreviewAssist } = await import(pathToFileURL(turnPreviewPath
 
 const course = createTrackCourse();
 
-const idlePreview = evaluateTurnPreviewAssist(760, course.turnMarkers);
-assert.equal(idlePreview.active, false, "expected no preview before major turn window");
-assert.equal(idlePreview.blend, 0, "expected no preview blend before major turn window");
+assert.ok(course.turnMarkers.length >= 9, `expected continuous spiral turn markers, got ${course.turnMarkers.length}`);
+assert.equal(course.turnMarkers.every((turn) => turn.kind === "sweep"), true, "expected spiral turns to use sweep previews");
 
-const firstTurnApproach = evaluateTurnPreviewAssist(900, course.turnMarkers);
-assert.equal(firstTurnApproach.active, true, "expected preview active well before first major turn");
-assert.ok(firstTurnApproach.blend >= 0.58, `expected meaningful early preview blend before first major turn, got ${firstTurnApproach.blend.toFixed(2)}`);
-assert.ok(firstTurnApproach.lookAheadDistance >= 35, `expected earlier camera look-ahead before first major turn, got ${firstTurnApproach.lookAheadDistance.toFixed(2)}`);
-assert.ok(firstTurnApproach.betaOffset <= -0.17, `expected stronger early overhead pitch before first major turn, got ${firstTurnApproach.betaOffset.toFixed(2)}`);
-assert.ok(firstTurnApproach.targetLiftY >= 0.72, `expected earlier camera lift before first major turn, got ${firstTurnApproach.targetLiftY.toFixed(2)}`);
+const startPreview = evaluateTurnPreviewAssist(0, course.turnMarkers);
+assert.equal(startPreview.active, true, "expected preview to be active immediately on spiral course");
+assert.ok(startPreview.blend > 0 && startPreview.blend < 0.25, `expected gentle start preview blend, got ${startPreview.blend.toFixed(2)}`);
 
-const firstTurnEntry = evaluateTurnPreviewAssist(950, course.turnMarkers);
-assert.equal(firstTurnEntry.active, true, "expected preview active on first major turn entry");
-assert.ok(firstTurnEntry.blend >= 0.78, `expected stronger early preview blend before first major turn, got ${firstTurnEntry.blend.toFixed(2)}`);
-assert.ok(firstTurnEntry.directionBias <= -0.55, `expected leftward preview bias before first major turn, got ${firstTurnEntry.directionBias.toFixed(2)}`);
-assert.ok(firstTurnEntry.targetLeadZ >= 3.5, `expected entry camera lead to look further ahead, got ${firstTurnEntry.targetLeadZ.toFixed(2)}`);
-assert.ok(firstTurnEntry.betaOffset <= -0.24, `expected steeper entry overhead pitch before first major turn, got ${firstTurnEntry.betaOffset.toFixed(2)}`);
-assert.ok(firstTurnEntry.targetLiftY >= 1.0, `expected higher entry camera lift before first major turn, got ${firstTurnEntry.targetLiftY.toFixed(2)}`);
+const firstSpiral = evaluateTurnPreviewAssist(220, course.turnMarkers);
+assert.equal(firstSpiral.active, true, "expected first spiral preview active");
+assert.ok(firstSpiral.blend >= 0.95, `expected strong first spiral preview, got ${firstSpiral.blend.toFixed(2)}`);
+assert.ok(firstSpiral.directionBias <= -0.85, `expected first spiral preview to point left, got ${firstSpiral.directionBias.toFixed(2)}`);
+assert.ok(firstSpiral.lookAheadDistance >= 48, `expected spiral camera to look ahead, got ${firstSpiral.lookAheadDistance.toFixed(2)}`);
+assert.ok(firstSpiral.betaOffset <= -0.28, `expected spiral camera to add overhead pitch, got ${firstSpiral.betaOffset.toFixed(2)}`);
 
-const firstTurnApex = evaluateTurnPreviewAssist(1018, course.turnMarkers);
-assert.ok(firstTurnApex.blend >= 0.8, `expected peak preview around first turn apex, got ${firstTurnApex.blend.toFixed(2)}`);
-assert.ok(firstTurnApex.lookAheadDistance >= 38, `expected camera to look much further ahead through first apex, got ${firstTurnApex.lookAheadDistance.toFixed(2)}`);
-assert.ok(firstTurnApex.targetLiftY >= 1.08, `expected apex camera to lift up for better bend visibility, got ${firstTurnApex.targetLiftY.toFixed(2)}`);
-assert.ok(firstTurnApex.betaOffset <= -0.24, `expected apex camera to maintain steeper overhead pitch, got ${firstTurnApex.betaOffset.toFixed(2)}`);
+const crestPreview = evaluateTurnPreviewAssist(800, course.turnMarkers);
+assert.equal(crestPreview.active, true, "expected preview active at uphill-to-downhill crest");
+assert.ok(Math.abs(crestPreview.directionBias) >= 0.85, `expected strong crest direction bias, got ${crestPreview.directionBias.toFixed(2)}`);
+assert.ok(crestPreview.targetLiftY >= 1.1, `expected crest preview to lift camera, got ${crestPreview.targetLiftY.toFixed(2)}`);
 
-const betweenTurns = evaluateTurnPreviewAssist(1180, course.turnMarkers);
-assert.ok(betweenTurns.blend >= 0.7, `expected preview to stay readable through long-arc transition, got ${betweenTurns.blend.toFixed(2)}`);
+const downhillPreview = evaluateTurnPreviewAssist(1570, course.turnMarkers);
+assert.equal(downhillPreview.active, true, "expected preview active on downhill spiral");
+assert.ok(downhillPreview.blend >= 0.9, `expected strong downhill spiral preview, got ${downhillPreview.blend.toFixed(2)}`);
+assert.ok(downhillPreview.radiusBoost >= 2.4, `expected downhill spiral radius boost, got ${downhillPreview.radiusBoost.toFixed(2)}`);
 
-const secondTurnEntry = evaluateTurnPreviewAssist(1310, course.turnMarkers);
-assert.equal(secondTurnEntry.active, true, "expected preview active on second major turn entry");
-assert.ok(secondTurnEntry.blend >= 0.7, `expected stronger early preview blend before second major turn, got ${secondTurnEntry.blend.toFixed(2)}`);
-assert.ok(secondTurnEntry.directionBias >= 0.55, `expected rightward preview bias before second major turn, got ${secondTurnEntry.directionBias.toFixed(2)}`);
-assert.ok(secondTurnEntry.radiusBoost >= 2.0, `expected second turn entry camera radius boost, got ${secondTurnEntry.radiusBoost.toFixed(2)}`);
+const latePreview = evaluateTurnPreviewAssist(2350, course.turnMarkers);
+assert.equal(latePreview.active, true, "expected late spiral preview active");
+assert.ok(latePreview.lookAheadDistance >= 45, `expected late spiral camera look-ahead, got ${latePreview.lookAheadDistance.toFixed(2)}`);
 
-const secondTurnExit = evaluateTurnPreviewAssist(1454, course.turnMarkers);
-assert.ok(secondTurnExit.blend >= 0.35, `expected preview to persist further through second turn exit, got ${secondTurnExit.blend.toFixed(2)}`);
-
-console.log("Turn preview assist OK");
+console.log("Spiral turn preview assist OK");

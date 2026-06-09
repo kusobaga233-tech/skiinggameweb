@@ -24,12 +24,16 @@ const { createTrackCourse } = await import(pathToFileURL(compiledPath).href);
 const course = createTrackCourse();
 const smallRamps = course.ramps.filter((ramp) => ramp.kind === "small");
 const largeRamps = course.ramps.filter((ramp) => ramp.kind === "large");
+const trackWideRamps = largeRamps.filter((ramp) => ramp.halfWidth >= course.courseHalfWidth - 0.6);
+const focusedLargeRamp = largeRamps.find((ramp) => ramp.centerZ === 2060);
 
 assert.ok(smallRamps.length > 0, "expected existing small ramps to remain in the course");
 assert.ok(largeRamps.length >= 1, "expected at least one large jump ramp in the course");
+assert.equal(trackWideRamps.length, 2, `expected 2 track-wide large ramps, got ${trackWideRamps.length}`);
+assert.ok(focusedLargeRamp, "expected focused large ramp at z=2060");
 
 const smallReference = smallRamps[0];
-const largeReference = largeRamps[0];
+const largeReference = focusedLargeRamp;
 
 assert.equal(
   Number((largeReference.halfWidth / smallReference.halfWidth).toFixed(2)),
@@ -44,5 +48,13 @@ assert.ok(
   largeReference.surfaceRise > smallReference.surfaceRise,
   `expected large ramp to have a taller surface rise than a small ramp, got ${largeReference.surfaceRise} vs ${smallReference.surfaceRise}`
 );
+
+for (const ramp of trackWideRamps) {
+  assert.equal(
+    ramp.halfWidth,
+    course.courseHalfWidth,
+    `expected track-wide ramp at z=${ramp.centerZ} to span the course half width`
+  );
+}
 
 console.log("Large ramp course setup OK");

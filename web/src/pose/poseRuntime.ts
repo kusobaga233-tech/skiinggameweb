@@ -3,13 +3,17 @@ import {
   PoseLandmarker,
   type NormalizedLandmark
 } from "@mediapipe/tasks-vision";
-import { MotionMapper } from "./motionMapper";
+import { MotionMapper, type MotionMapperConfig } from "./motionMapper";
 import type { MotionState, PoseJointSample, PoseOverlayFrame, PoseRuntimeStatus, PoseSample } from "./types";
+
+export interface PoseRuntimeConfig {
+  motionMapper?: Partial<MotionMapperConfig>;
+}
 
 export class PoseRuntime {
   private poseLandmarker: PoseLandmarker | null = null;
   private animationFrameId = 0;
-  private readonly mapper = new MotionMapper();
+  private readonly mapper: MotionMapper;
   private readonly status: PoseRuntimeStatus = {
     ready: false,
     message: "Pose runtime idle",
@@ -18,6 +22,10 @@ export class PoseRuntime {
     confidence: 0
   };
   private lastFrameTime = performance.now();
+
+  constructor(config: PoseRuntimeConfig = {}) {
+    this.mapper = new MotionMapper(config.motionMapper);
+  }
 
   async initialize(): Promise<void> {
     if (this.poseLandmarker) {
@@ -109,7 +117,9 @@ export class PoseRuntime {
         timestampMs: Math.round(nowMs),
         dt,
         hipCenterX: 0.5,
+        hipCenterY: 0.62,
         shoulderCenterX: 0.5,
+        shoulderCenterY: 0.38,
         kneeRatio: 1,
         confidence: 0,
         legConfidence: 0,
@@ -133,7 +143,9 @@ export class PoseRuntime {
     const rightWrist = landmarks[16];
 
     const hipCenterX = (leftHip.x + rightHip.x) * 0.5;
+    const hipCenterY = (leftHip.y + rightHip.y) * 0.5;
     const shoulderCenterX = (leftShoulder.x + rightShoulder.x) * 0.5;
+    const shoulderCenterY = (leftShoulder.y + rightShoulder.y) * 0.5;
     const kneeRatio = (this.legLength(landmarks, 23, 25, 27) + this.legLength(landmarks, 24, 26, 28)) * 0.5;
     const confidence = this.landmarksInFrame(landmarks, [11, 12, 23, 24]) ? 1 : 0;
     const legConfidence = this.landmarksInFrame(landmarks, [23, 24, 25, 26, 27, 28]) ? 1 : 0;
@@ -143,7 +155,9 @@ export class PoseRuntime {
       timestampMs: Math.round(nowMs),
       dt,
       hipCenterX,
+      hipCenterY,
       shoulderCenterX,
+      shoulderCenterY,
       kneeRatio,
       confidence,
       legConfidence,

@@ -10,6 +10,11 @@
     <div id="app-shell">
       <canvas id="game-canvas"></canvas>
       <div id="overlay">
+        <div class="track-switcher" aria-label="Track Switcher">
+          <button id="track-1-button" type="button">赛道1</button>
+          <button id="track-2-button" type="button">赛道2</button>
+        </div>
+
         <div id="boost-tutorial-shell" class="boost-tutorial-shell">
           <video
             id="boost-tutorial-video"
@@ -21,6 +26,25 @@
             playsinline
             preload="auto"
           ></video>
+        </div>
+
+        <div id="start-boost-shell" class="start-boost-shell">
+          <div class="start-boost-label">START POLE</div>
+          <div class="start-boost-track">
+            <div id="start-boost-fill" class="start-boost-fill"></div>
+          </div>
+          <div id="start-boost-value" class="start-boost-value">READY</div>
+        </div>
+
+        <div id="speed-meter" class="speed-meter" aria-label="Speed Meter">
+          <div class="speed-meter-label">SPEED</div>
+          <div class="speed-meter-main">
+            <span id="speed-meter-value" class="speed-meter-value">0.0</span>
+            <span class="speed-meter-unit">KM/H</span>
+          </div>
+          <div class="speed-meter-track">
+            <div id="speed-meter-bar" class="speed-meter-bar"></div>
+          </div>
         </div>
 
         <section class="panel hud-panel">

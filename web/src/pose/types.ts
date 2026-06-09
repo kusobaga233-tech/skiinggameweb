@@ -1,5 +1,6 @@
 export interface MotionState {
   steer: number;
+  snowplow: number;
   tuck: number;
   brake: number;
   jumpTriggered: boolean;
@@ -25,7 +26,9 @@ export interface PoseSample {
   timestampMs: number;
   dt: number;
   hipCenterX: number;
+  hipCenterY: number;
   shoulderCenterX: number;
+  shoulderCenterY: number;
   kneeRatio: number;
   confidence: number;
   legConfidence: number;
@@ -68,5 +71,11 @@ export interface HudState {
   inferenceMs: number;
   playerX: number;
   playerZ: number;
+  edgeHold: number;
+  driftSlip: number;
+  startBoostProgress: number;
+  startBoostBonusRatio: number;
+  startBoostLocked: boolean;
+  startBoostWaiting: boolean;
   motion: MotionState;
 }

@@ -13,7 +13,9 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { Scene } from "@babylonjs/core/scene";
 import { createInactiveSnowTrailState, type SnowTrailState } from "./snowTrail";
-import { evaluateCourseCenterX, evaluateCourseElevation, evaluateCourseTangent, sampleCoursePoint, type RampData, type TrackCourse } from "./trackCourse";
+import { evaluateCourseCenterX, evaluateCourseElevation, evaluateCourseTangent, evaluateTurnEntryHint, sampleCoursePoint, type RampData, type TrackCourse } from "./trackCourse";
+
+const ENABLE_DYNAMIC_BACKDROP = false;
 
 export interface BuiltScene {
   engine: Engine;
@@ -61,7 +63,9 @@ export interface SkierAvatarRig {
     turnBlend?: number,
     lateralLean?: number,
     pumpBlend?: number,
-    brakeBlend?: number
+    brakeBlend?: number,
+    edgeHold?: number,
+    driftSlip?: number
   ): void;
 }
 
@@ -77,7 +81,8 @@ export function buildScene(canvas: HTMLCanvasElement, course: TrackCourse): Buil
   sun.position = new Vector3(10, 18, -10);
   sun.intensity = 1.1;
 
-  const camera = new ArcRotateCamera("follow-camera", -Math.PI / 2, 1.05, 11, new Vector3(0, 1.4, 6), scene);
+  const camera = new ArcRotateCamera("follow-camera", -Math.PI / 2, 1.05, 11, new Vector3(0, evaluateCourseElevation(0) + 1.4, 6), scene);
+  scene.activeCamera = camera;
   camera.fov = 0.8;
   camera.lowerRadiusLimit = 8;
   camera.upperRadiusLimit = 14;
@@ -211,6 +216,7 @@ export function buildScene(canvas: HTMLCanvasElement, course: TrackCourse): Buil
 
   createStartMarker(scene, course);
   createTurnMarkerSigns(scene, course);
+  createTurnEntryArrowSigns(scene, course);
 
   const snowPlane = MeshBuilder.CreateGround("snow-backdrop", {
     width: course.courseHalfWidth * 16,
@@ -219,9 +225,19 @@ export function buildScene(canvas: HTMLCanvasElement, course: TrackCourse): Buil
   snowPlane.position = new Vector3(0, sampleHeight(course, course.length * 0.4) - 2.2, course.length * 0.45);
   snowPlane.material = snowMaterial;
 
-  createDynamicBackdrop(scene, camera);
+  if (ENABLE_DYNAMIC_BACKDROP) {
+    tryCreateDynamicBackdrop(scene, camera);
+  }
 
   return { engine, scene, camera, skier, skierAvatarRig, snowTrailEffect, ground };
+}
+
+function tryCreateDynamicBackdrop(scene: Scene, camera: ArcRotateCamera): void {
+  try {
+    createDynamicBackdrop(scene, camera);
+  } catch (error) {
+    console.warn("Dynamic backdrop disabled after initialization failure.", error);
+  }
 }
 
 function createSafeSnowTrailEffect(scene: Scene, skier: Mesh): SkierSnowTrailEffect {
@@ -281,6 +297,32 @@ function createSkierSnowTrailEffect(scene: Scene, skier: Mesh): SkierSnowTrailEf
   emitterAnchor.isVisible = false;
   emitterAnchor.isPickable = false;
 
+  const skidMarkMaterial = new StandardMaterial("skier-skid-mark-mat", scene);
+  skidMarkMaterial.diffuseColor = new Color3(0.05, 0.05, 0.05);
+  skidMarkMaterial.emissiveColor = new Color3(0.02, 0.02, 0.02);
+  skidMarkMaterial.specularColor = new Color3(0, 0, 0);
+  skidMarkMaterial.alpha = 0;
+
+  const leftSkidMark = MeshBuilder.CreateGround("skier-skid-mark-left", {
+    width: 0.18,
+    height: 1.18
+  }, scene);
+  leftSkidMark.parent = skier;
+  leftSkidMark.position = new Vector3(-0.2, -1.155, 0.02);
+  leftSkidMark.material = skidMarkMaterial;
+  leftSkidMark.isPickable = false;
+  leftSkidMark.renderingGroupId = 1;
+
+  const rightSkidMark = MeshBuilder.CreateGround("skier-skid-mark-right", {
+    width: 0.18,
+    height: 1.18
+  }, scene);
+  rightSkidMark.parent = skier;
+  rightSkidMark.position = new Vector3(0.2, -1.155, 0.02);
+  rightSkidMark.material = skidMarkMaterial;
+  rightSkidMark.isPickable = false;
+  rightSkidMark.renderingGroupId = 1;
+
   const system = new ParticleSystem("skier-snow-trail", 320, scene);
   system.particleTexture = particleTexture;
   system.emitter = emitterAnchor;
@@ -323,6 +365,10 @@ function createSkierSnowTrailEffect(scene: Scene, skier: Mesh): SkierSnowTrailEf
       system.maxEmitPower = resolved.maxEmitPower;
       system.direction1 = new Vector3(drift - 0.14, lift * 0.75, -0.62);
       system.direction2 = new Vector3(drift + 0.14, lift + 0.08, -0.36);
+      const skidAlpha = resolved.brakeBlend * 0.42;
+      skidMarkMaterial.alpha = skidAlpha;
+      leftSkidMark.isVisible = skidAlpha > 0.01;
+      rightSkidMark.isVisible = skidAlpha > 0.01;
     }
   };
 }
@@ -408,6 +454,64 @@ function createTurnMarkerSigns(scene: Scene, course: TrackCourse): void {
     texture.update();
 
     const signMaterial = new StandardMaterial(`turn-marker-sign-mat-${turn.index}`, scene);
+    signMaterial.diffuseTexture = texture;
+    signMaterial.emissiveTexture = texture;
+    signMaterial.opacityTexture = texture;
+    signMaterial.disableLighting = true;
+    signMaterial.backFaceCulling = false;
+    sign.material = signMaterial;
+  }
+}
+
+function createTurnEntryArrowSigns(scene: Scene, course: TrackCourse): void {
+  for (const turn of course.turnMarkers) {
+    const entryHint = evaluateTurnEntryHint(turn, course.courseHalfWidth);
+    const entryMidZ = turn.start - 58;
+    const baseY = sampleHeight(course, entryMidZ);
+    const edgeSign = turn.direction === "left" ? 1 : -1;
+    const centerX = evaluateCourseCenterX(entryMidZ) + edgeSign * (course.courseHalfWidth + 3.2);
+
+    const post = MeshBuilder.CreateCylinder(`turn-entry-arrow-post-${turn.index}`, {
+      height: 5.8,
+      diameter: 0.22
+    }, scene);
+    post.position = new Vector3(centerX, baseY + 2.9, entryMidZ);
+
+    const postMaterial = new StandardMaterial(`turn-entry-arrow-post-mat-${turn.index}`, scene);
+    postMaterial.diffuseColor = Color3.FromHexString("#143d8c");
+    postMaterial.emissiveColor = Color3.FromHexString("#0d2552");
+    post.material = postMaterial;
+
+    const sign = MeshBuilder.CreatePlane(`turn-entry-arrow-sign-${turn.index}`, {
+      width: 5.8,
+      height: 2
+    }, scene);
+    sign.position = new Vector3(centerX, baseY + 5.45, entryMidZ);
+    sign.billboardMode = Mesh.BILLBOARDMODE_ALL;
+    sign.renderingGroupId = 1;
+
+    const texture = new DynamicTexture(`turn-entry-arrow-tex-${turn.index}`, {
+      width: 1024,
+      height: 384
+    }, scene, true);
+    texture.hasAlpha = true;
+    const context = texture.getContext() as unknown as CanvasRenderingContext2D;
+    context.clearRect(0, 0, 1024, 384);
+    context.fillStyle = entryHint.direction === "left" ? "rgba(16, 48, 112, 0.94)" : "rgba(143, 61, 26, 0.94)";
+    context.fillRect(0, 0, 1024, 384);
+    context.strokeStyle = "rgba(255,255,255,0.96)";
+    context.lineWidth = 20;
+    context.strokeRect(20, 20, 984, 344);
+    context.fillStyle = "#ffffff";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.font = "bold 224px sans-serif";
+    context.fillText(entryHint.arrowText, 512, 176);
+    context.font = "bold 72px sans-serif";
+    context.fillText(turn.label, 512, 306);
+    texture.update();
+
+    const signMaterial = new StandardMaterial(`turn-entry-arrow-sign-mat-${turn.index}`, scene);
     signMaterial.diffuseTexture = texture;
     signMaterial.emissiveTexture = texture;
     signMaterial.opacityTexture = texture;
@@ -571,19 +675,24 @@ function createSkierAvatar(scene: Scene, materials: SkierMaterials): { root: Mes
   }
 
   const rig: SkierAvatarRig = {
-    applyPose(tuck: number, glide = 0, carve = 0, turnBlend = 0, lateralLean = 0, pumpBlend = 0, brakeBlend = 0): void {
+    applyPose(tuck: number, glide = 0, carve = 0, turnBlend = 0, lateralLean = 0, pumpBlend = 0, brakeBlend = 0, edgeHold = 0, driftSlip = 0): void {
       const blend = clamp01(tuck);
-      const poseBlend = Math.max(blend, clamp01(glide) * 0.34);
+      const glideBaseBlend = clamp01(glide) * 0.5;
+      const brakeCrouchBlend = clamp01(brakeBlend) * 0.24;
+      const poseBlend = clamp01(Math.max(glideBaseBlend, blend, glideBaseBlend + brakeCrouchBlend));
       const carveClamped = clampSigned(carve);
       const carveBlend = clamp01(Math.abs(carveClamped) * 0.95 + clamp01(turnBlend) * 0.45);
+      const carveGripBlend = carveBlend * clamp01(0.3 + edgeHold * 0.85) * clamp01(1 - driftSlip * 0.78);
+      const driftWashBlend = carveBlend * driftSlip;
       const lateralLeanClamped = clampSigned(lateralLean);
       const lateralLeanBlend = clamp01(Math.abs(lateralLeanClamped));
       const polePlantBlend = clamp01(pumpBlend);
-      const brakePoseBlend = clamp01(brakeBlend);
+      const brakePoseBlend = clamp01(brakeBlend * 1.35);
       for (const part of parts) {
         const position = Vector3.Lerp(part.basePosition, part.tuckPosition, poseBlend);
         const rotation = Vector3.Lerp(part.baseRotation, part.tuckRotation, poseBlend);
-        applyCarveAdjustments(part.mesh, position, rotation, carveClamped, carveBlend);
+        applyForwardCrouchAdjustments(part.mesh, position, rotation, poseBlend, brakePoseBlend);
+        applyCarveAdjustments(part.mesh, position, rotation, carveClamped, carveGripBlend, driftWashBlend);
         applyLateralLeanAdjustments(part.mesh, position, rotation, lateralLeanClamped, lateralLeanBlend);
         applyPumpAdjustments(part.mesh, position, rotation, polePlantBlend);
         applyBrakeAdjustments(part.mesh, position, rotation, brakePoseBlend);
@@ -858,7 +967,8 @@ function applyCarveAdjustments(
   position: Vector3,
   rotation: Vector3,
   carve: number,
-  carveBlend: number
+  carveBlend: number,
+  driftWashBlend: number
 ): void {
   if (carveBlend <= 0.001) {
     return;
@@ -869,27 +979,31 @@ function applyCarveAdjustments(
   const inside = side !== 0 && side === carveSign;
   const outside = side !== 0 && side === -carveSign;
   const carveAbs = Math.abs(carve);
+  const stableEdgeBlend = clamp01(carveBlend * (1 - driftWashBlend * 0.55));
+  const washedEdgeBlend = clamp01(driftWashBlend);
 
   if (mesh.name === "skier-pelvis") {
-    position.x += carve * 0.05 * carveBlend;
-    position.y -= carveBlend * 0.04;
-    rotation.y += carve * 0.16 * carveBlend;
-    rotation.z += carve * 0.1 * carveBlend;
+    position.x += carve * 0.05 * stableEdgeBlend;
+    position.y -= stableEdgeBlend * 0.04;
+    rotation.y += carve * 0.16 * stableEdgeBlend;
+    rotation.z += carve * 0.1 * stableEdgeBlend;
+    rotation.y -= carve * 0.08 * washedEdgeBlend;
     return;
   }
 
   if (mesh.name === "skier-torso" || mesh.name === "skier-chest") {
-    position.x += carve * 0.06 * carveBlend;
-    rotation.y += carve * 0.08 * carveBlend;
-    rotation.z += carve * 0.16 * carveBlend;
-    rotation.x -= carveBlend * 0.05;
+    position.x += carve * 0.06 * stableEdgeBlend;
+    rotation.y += carve * 0.08 * stableEdgeBlend;
+    rotation.z += carve * 0.16 * stableEdgeBlend;
+    rotation.x -= stableEdgeBlend * 0.05;
+    rotation.y -= carve * 0.09 * washedEdgeBlend;
     return;
   }
 
   if (mesh.name === "skier-neck" || mesh.name === "skier-head" || mesh.name === "skier-helmet" || mesh.name === "skier-goggle") {
-    position.x += carve * 0.04 * carveBlend;
-    rotation.y += carve * 0.04 * carveBlend;
-    rotation.z += carve * 0.1 * carveBlend;
+    position.x += carve * 0.04 * stableEdgeBlend;
+    rotation.y += carve * 0.04 * stableEdgeBlend;
+    rotation.z += carve * 0.1 * stableEdgeBlend;
     return;
   }
 
@@ -933,83 +1047,86 @@ function applyCarveAdjustments(
 
   if (mesh.name.includes("upper-leg")) {
     if (inside) {
-      position.x += carve * 0.09 * carveBlend;
-      position.y += 0.12 * carveBlend;
-      position.z -= 0.06 * carveBlend;
-      rotation.x += 0.48 * carveBlend;
-      rotation.y += carve * 0.14 * carveBlend;
-      rotation.z += carve * 0.34 * carveBlend;
+      position.x += carve * 0.09 * stableEdgeBlend;
+      position.y += 0.12 * stableEdgeBlend;
+      position.z -= 0.06 * stableEdgeBlend;
+      rotation.x += 0.48 * stableEdgeBlend;
+      rotation.y += carve * 0.14 * stableEdgeBlend;
+      rotation.z += carve * 0.34 * stableEdgeBlend;
     } else if (outside) {
-      position.x += carve * 0.085 * carveBlend;
-      position.y -= 0.08 * carveBlend;
-      position.z += 0.05 * carveBlend;
-      rotation.x -= 0.22 * carveBlend;
-      rotation.y += carve * 0.18 * carveBlend;
-      rotation.z += carve * 0.28 * carveBlend;
+      position.x += carve * 0.085 * stableEdgeBlend;
+      position.y -= 0.08 * stableEdgeBlend;
+      position.z += 0.05 * stableEdgeBlend;
+      rotation.x -= 0.22 * stableEdgeBlend;
+      rotation.y += carve * 0.18 * stableEdgeBlend;
+      rotation.z += carve * 0.28 * stableEdgeBlend;
     }
     return;
   }
 
   if (mesh.name.includes("knee")) {
     if (inside) {
-      position.x += carve * 0.12 * carveBlend;
-      position.y += 0.16 * carveBlend;
-      position.z -= 0.05 * carveBlend;
+      position.x += carve * 0.12 * stableEdgeBlend;
+      position.y += 0.16 * stableEdgeBlend;
+      position.z -= 0.05 * stableEdgeBlend;
     } else if (outside) {
-      position.x += carve * 0.13 * carveBlend;
-      position.y -= 0.07 * carveBlend;
-      position.z += 0.06 * carveBlend;
+      position.x += carve * 0.13 * stableEdgeBlend;
+      position.y -= 0.07 * stableEdgeBlend;
+      position.z += 0.06 * stableEdgeBlend;
     }
     return;
   }
 
   if (mesh.name.includes("lower-leg")) {
     if (inside) {
-      position.x += carve * 0.12 * carveBlend;
-      position.y += 0.12 * carveBlend;
-      position.z -= 0.07 * carveBlend;
-      rotation.x -= 0.38 * carveBlend;
-      rotation.y += carve * 0.12 * carveBlend;
-      rotation.z += carve * 0.36 * carveBlend;
+      position.x += carve * 0.12 * stableEdgeBlend;
+      position.y += 0.16 * stableEdgeBlend;
+      position.z -= 0.08 * stableEdgeBlend;
+      rotation.x -= 0.44 * stableEdgeBlend;
+      rotation.y += carve * 0.12 * stableEdgeBlend;
+      rotation.z += carve * (inside ? 0.52 : 0.42) * stableEdgeBlend;
     } else if (outside) {
-      position.x += carve * 0.13 * carveBlend;
-      position.y -= 0.05 * carveBlend;
-      position.z += 0.07 * carveBlend;
-      rotation.x += 0.18 * carveBlend;
-      rotation.y += carve * 0.16 * carveBlend;
-      rotation.z += carve * 0.3 * carveBlend;
+      position.x += carve * 0.13 * stableEdgeBlend;
+      position.y -= 0.06 * stableEdgeBlend;
+      position.z += 0.08 * stableEdgeBlend;
+      rotation.x += 0.22 * stableEdgeBlend;
+      rotation.y += carve * 0.16 * stableEdgeBlend;
+      rotation.z += carve * (inside ? 0.52 : 0.42) * stableEdgeBlend;
     }
     return;
   }
 
   if (mesh.name.includes("ankle") || mesh.name.includes("boot")) {
     if (inside) {
-      position.x += carve * 0.14 * carveBlend;
-      position.y += 0.02 * carveBlend;
-      position.z -= 0.03 * carveBlend;
-      rotation.y += carve * 0.12 * carveBlend;
-      rotation.z += carve * 0.18 * carveBlend;
+      position.x += carve * 0.14 * stableEdgeBlend;
+      position.y += 0.04 * stableEdgeBlend;
+      position.z -= 0.04 * stableEdgeBlend;
+      rotation.y += carve * 0.12 * stableEdgeBlend;
+      rotation.z += carve * (inside ? 0.32 : 0.24) * stableEdgeBlend;
     } else if (outside) {
-      position.x += carve * 0.14 * carveBlend;
-      position.y -= 0.02 * carveBlend;
-      position.z += 0.03 * carveBlend;
-      rotation.y += carve * 0.18 * carveBlend;
-      rotation.z += carve * 0.15 * carveBlend;
+      position.x += carve * 0.14 * stableEdgeBlend;
+      position.y -= 0.03 * stableEdgeBlend;
+      position.z += 0.04 * stableEdgeBlend;
+      rotation.y += carve * 0.18 * stableEdgeBlend;
+      rotation.z += carve * (inside ? 0.32 : 0.24) * stableEdgeBlend;
     }
     return;
   }
 
   if (mesh.name.includes("ski-tip") || mesh.name.includes("ski-")) {
-    const edgeTilt = inside ? 0.12 : 0.1;
-    position.x += carve * 0.15 * carveBlend;
-    position.z += (outside ? 0.03 : -0.01) * carveBlend;
-    rotation.z += carve * edgeTilt * carveBlend;
-    rotation.y += carve * (inside ? 0.05 : 0.08) * carveBlend;
+    const edgeTilt = inside ? 0.42 : 0.34;
+    position.x += carve * 0.17 * stableEdgeBlend;
+    position.z += (outside ? 0.04 : -0.015) * stableEdgeBlend;
+    rotation.z += carve * edgeTilt * stableEdgeBlend;
+    rotation.z -= carve * 0.14 * washedEdgeBlend;
+    rotation.y += carve * (inside ? 0.06 : 0.1) * stableEdgeBlend;
+    rotation.y -= carve * 0.08 * washedEdgeBlend;
     if (mesh.name.includes("ski-")) {
-      position.y += inside ? -0.015 * carveBlend : -0.02 * carveBlend;
+      position.y += inside ? -0.045 * stableEdgeBlend : -0.03 * stableEdgeBlend;
+      position.y += 0.02 * washedEdgeBlend;
     }
     if (mesh.name.includes("ski-tip")) {
-      position.z += carveAbs * 0.02 * carveBlend;
+      position.z += carveAbs * 0.03 * stableEdgeBlend;
     }
   }
 }
@@ -1081,6 +1198,44 @@ function applyPumpAdjustments(
     position.y -= 0.18 * pumpBlend;
     position.z -= 0.24 * pumpBlend;
     rotation.x += 0.34 * pumpBlend;
+  }
+}
+
+function applyForwardCrouchAdjustments(
+  mesh: Mesh,
+  position: Vector3,
+  rotation: Vector3,
+  poseBlend: number,
+  brakeBlend: number
+): void {
+  const forwardLeanBlend = clamp01(poseBlend * 0.8 + brakeBlend * 0.35);
+  if (forwardLeanBlend <= 0.001) {
+    return;
+  }
+
+  if (mesh.name === "skier-pelvis") {
+    position.z += forwardLeanBlend * 0.025;
+    rotation.x -= forwardLeanBlend * 0.05;
+    return;
+  }
+
+  if (mesh.name === "skier-torso" || mesh.name === "skier-chest") {
+    position.z += forwardLeanBlend * 0.06;
+    position.y -= forwardLeanBlend * 0.02;
+    rotation.x -= forwardLeanBlend * 0.12;
+    return;
+  }
+
+  if (mesh.name === "skier-neck" || mesh.name === "skier-head" || mesh.name === "skier-helmet" || mesh.name === "skier-goggle") {
+    position.z += forwardLeanBlend * 0.05;
+    rotation.x -= forwardLeanBlend * 0.08;
+    return;
+  }
+
+  if (mesh.name.includes("shoulder") || mesh.name.includes("upper-arm") || mesh.name.includes("elbow") || mesh.name.includes("lower-arm") || mesh.name.includes("hand")) {
+    position.z += forwardLeanBlend * 0.04;
+    rotation.x -= forwardLeanBlend * 0.07;
+    return;
   }
 }
 
@@ -1195,7 +1350,7 @@ function applyBrakeAdjustments(
     position.x += side * 0.08 * brakeBlend;
     position.y -= 0.08 * brakeBlend;
     rotation.x += 0.42 * brakeBlend;
-    rotation.z += side * 0.42 * brakeBlend;
+    rotation.z += side * 0.58 * brakeBlend;
     return;
   }
 
@@ -1267,13 +1422,13 @@ function applyBrakeAdjustments(
   }
 
   if (mesh.name.includes("ski-tip")) {
-    rotation.y += side * 0.22 * brakeBlend;
+    rotation.y += side * 0.34 * brakeBlend;
     position.x += side * 0.06 * brakeBlend;
     return;
   }
 
   if (mesh.name.includes("ski-")) {
-    rotation.y += side * 0.12 * brakeBlend;
+    rotation.y += side * 0.22 * brakeBlend;
     position.x += side * 0.05 * brakeBlend;
     return;
   }

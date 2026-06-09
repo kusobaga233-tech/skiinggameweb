@@ -69,12 +69,19 @@ export class RunSession {
     }
   }
 
-  consumeRamp(skierX: number, skierZ: number, jumpHeld: boolean): { launchBoost: number; airBonus: boolean } | null {
+  consumeRamp(
+    skierX: number,
+    previousSkierZ: number,
+    skierZ: number,
+    jumpHeld: boolean
+  ): { launchBoost: number; airBonus: boolean } | null {
+    const minSkierZ = Math.min(previousSkierZ, skierZ);
+    const maxSkierZ = Math.max(previousSkierZ, skierZ);
     const ramp = this.course.ramps.find((item) => {
       const insideX = Math.abs(skierX - item.centerX) <= item.halfWidth;
-      const startZ = item.centerZ - item.length * 0.5;
       const endZ = item.centerZ + item.length * 0.5;
-      return !item.consumed && insideX && skierZ >= startZ && skierZ <= endZ;
+      const crossesExit = minSkierZ <= endZ && maxSkierZ >= endZ;
+      return !item.consumed && insideX && crossesExit;
     });
 
     if (!ramp) {

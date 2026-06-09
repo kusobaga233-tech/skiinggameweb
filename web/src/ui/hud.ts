@@ -21,11 +21,10 @@ export class Hud {
       `Pose FPS: ${state.poseFps.toFixed(1)}  Inference: ${state.inferenceMs.toFixed(1)}ms\n` +
       `Steer: ${state.motion.steer.toFixed(2)}\n` +
       `Tuck: ${state.motion.tuck.toFixed(2)}\n` +
-      `Brake: ${state.motion.brake.toFixed(2)}\n` +
       `Drive: ${state.motion.drive.toFixed(2)}  Pump: ${state.motion.pumpActive}  Hits: ${state.motion.pumpHits}\n` +
       `Boost Lock: ${state.motion.boostLocked}  Remaining: ${(state.motion.boostRemainingMs / 1000).toFixed(1)}s\n` +
-      `Jump: ${state.motion.jumpTriggered}\n` +
       `Confidence: ${state.motion.confidence.toFixed(2)}\n` +
+      `Edge Hold: ${state.edgeHold.toFixed(2)}  Drift Slip: ${state.driftSlip.toFixed(2)}\n` +
       `Source: ${state.motion.source}`;
 
     this.poseStatus.textContent = `${state.poseMessage} | ${state.cameraLabel}`;

@@ -2,35 +2,22 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const sourcePath = path.resolve("src/game/skierController.ts");
-const sourceText = await fs.readFile(sourcePath, "utf8");
+const sourceText = await fs.readFile(path.resolve("src/game/skierController.ts"), "utf8");
+const speedMeterText = await fs.readFile(path.resolve("src/ui/speedMeter.ts"), "utf8");
 
 function readNumber(name) {
-  const match = sourceText.match(new RegExp(`private readonly ${name} = ([0-9.]+);`));
+  const match = sourceText.match(new RegExp(`this\\.${name} = config\\.${name} \\?\\? ([0-9.]+);`));
   assert.ok(match, `expected to find numeric constant ${name}`);
   return Number(match[1]);
 }
 
-function readLateralSpeedBlend() {
-  const match = sourceText.match(
-    /const speedBlend = this\.clamp\(\(this\.currentForwardSpeed - ([0-9.]+)\) \/ ([0-9.]+), 0, 1\);/
-  );
-  assert.ok(match, "expected lateral speed blend formula");
-  return {
-    start: Number(match[1]),
-    span: Number(match[2])
-  };
-}
+assert.equal(readNumber("maxForwardSpeed"), 90, "expected forward speed cap to be 90");
+assert.ok(readNumber("downhillSpeedBoost") <= 180, "expected downhill push to be scaled for a 90 cap");
+assert.ok(readNumber("driveSpeedBoost") <= 18, "expected pole-plant drive to be scaled for a 90 cap");
+assert.ok(readNumber("startSpeedLimit") <= 18, "expected start speed limit to be scaled for a 90 cap");
+assert.ok(readNumber("pumpImpulseBoost") <= 6, "expected pump impulse to be scaled for a 90 cap");
+assert.ok(speedMeterText.includes("private maxSpeed = 90"), "expected speed meter to default to 90");
+assert.ok(speedMeterText.includes("clampedSpeed / this.maxSpeed"), "expected speed meter to use configured max speed");
+assert.ok(speedMeterText.includes("this.maxSpeed * 0.5"), "expected fast speed threshold to scale with configured max speed");
 
-assert.equal(readNumber("maxForwardSpeed"), 150, "expected forward speed cap to be 150");
-assert.ok(readNumber("downhillSpeedBoost") >= 340, "expected downhill push to scale with the new cap");
-assert.ok(readNumber("driveSpeedBoost") >= 32, "expected pump drive to keep authority at the new cap");
-assert.ok(readNumber("manualBrakeSpeedReduction") >= 44, "expected manual brake to remain meaningful at 150");
-assert.ok(readNumber("autoBrakeSpeedReduction") >= 24, "expected bend safety brake to scale at 150");
-assert.ok(readNumber("speedLateralAuthorityBoost") >= 2, "expected high-speed lateral authority to scale at 150");
-
-const lateralBlend = readLateralSpeedBlend();
-assert.equal(lateralBlend.start, 18, "expected existing low-speed lateral blend start");
-assert.ok(lateralBlend.span >= 100, "expected lateral authority growth to extend into the new high-speed range");
-
-console.log("150 speed cap tuning OK");
+console.log("90 speed cap tuning OK");

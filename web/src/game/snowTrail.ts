@@ -5,6 +5,7 @@ export interface SnowTrailInput {
   maxForwardSpeed: number;
   steer: number;
   lateralVelocity: number;
+  brakeBlend: number;
 }
 
 export interface SnowTrailState {
@@ -18,6 +19,7 @@ export interface SnowTrailState {
   maxEmitPower: number;
   driftX: number;
   liftY: number;
+  brakeBlend: number;
 }
 
 const IDLE_SNOW_TRAIL_STATE: SnowTrailState = {
@@ -30,7 +32,8 @@ const IDLE_SNOW_TRAIL_STATE: SnowTrailState = {
   minEmitPower: 0.06,
   maxEmitPower: 0.1,
   driftX: 0,
-  liftY: 0.07
+  liftY: 0.07,
+  brakeBlend: 0
 };
 
 export function createInactiveSnowTrailState(): SnowTrailState {
@@ -45,28 +48,31 @@ export function evaluateSnowTrailState(input: SnowTrailInput): SnowTrailState {
   const speedRatio = clamp((input.speed - 8) / Math.max(16, input.maxForwardSpeed - 8), 0, 1);
   const steerRatio = clamp(Math.abs(input.steer), 0, 1);
   const lateralRatio = clamp(Math.abs(input.lateralVelocity) / 10, 0, 1);
+  const snowplowRatio = clamp(input.brakeBlend ?? 0, 0, 1);
   const carveRatio = clamp(Math.max(steerRatio * 0.75, lateralRatio), 0, 1);
-  const intensity = clamp(speedRatio * 0.7 + carveRatio * 0.85, 0, 1);
+  const intensity = clamp(speedRatio * 0.7 + carveRatio * 0.85 + snowplowRatio * 0.55, 0, 1);
 
   if (input.speed < 8 || intensity < 0.08) {
     return createInactiveSnowTrailState();
   }
 
-  const emissionRate = Math.round(12 + intensity * 28 + carveRatio * 12);
-  const minEmitPower = 0.06 + speedRatio * 0.08 + carveRatio * 0.04;
-  const maxEmitPower = minEmitPower + 0.05 + intensity * 0.08;
+  const baseEmissionRate = Math.round(12 + intensity * 28 + carveRatio * 12);
+  const emissionRate = Math.round(baseEmissionRate * (1 + snowplowRatio * 9));
+  const minEmitPower = 0.06 + speedRatio * 0.08 + carveRatio * 0.04 + snowplowRatio * 0.05;
+  const maxEmitPower = minEmitPower + 0.05 + intensity * 0.08 + snowplowRatio * 0.06;
 
   return {
     active: true,
     emissionRate,
-    minSize: 0.04 + intensity * 0.015,
-    maxSize: 0.08 + intensity * 0.025 + carveRatio * 0.01,
-    minLifeTime: 0.06 + intensity * 0.02,
-    maxLifeTime: 0.11 + intensity * 0.035,
+    minSize: 0.04 + intensity * 0.015 + snowplowRatio * 0.008,
+    maxSize: 0.08 + intensity * 0.025 + carveRatio * 0.01 + snowplowRatio * 0.014,
+    minLifeTime: 0.06 + intensity * 0.02 + snowplowRatio * 0.008,
+    maxLifeTime: 0.11 + intensity * 0.035 + snowplowRatio * 0.014,
     minEmitPower,
     maxEmitPower,
     driftX: clamp(-input.steer * 0.18 - (input.lateralVelocity / 12) * 0.36, -0.42, 0.42),
-    liftY: 0.07 + intensity * 0.06 + carveRatio * 0.03
+    liftY: 0.07 + intensity * 0.06 + carveRatio * 0.03 + snowplowRatio * 0.03,
+    brakeBlend: snowplowRatio
   };
 }
 
