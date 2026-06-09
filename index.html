@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Skiiing Web</title>
-    <script type="module" crossorigin src="./assets/main-B6-m7HjH.js"></script>
+    <script type="module" crossorigin src="./assets/main-DiOV9wXE.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-B5Qt9EMX.js">
     <link rel="modulepreload" crossorigin href="./assets/babylon-DzXKDs_K.js">
-    <link rel="stylesheet" crossorigin href="./assets/main-B8jUnTin.css">
+    <link rel="stylesheet" crossorigin href="./assets/main-CTAdYemR.css">
   </head>
   <body>
     <div id="app-shell">
@@ -48,16 +48,27 @@
           <div class="speed-meter-track">
             <div id="speed-meter-bar" class="speed-meter-bar"></div>
           </div>
+          <div id="speed-meter-gates" class="speed-meter-gates">GATES 0/0</div>
         </div>
 
-        <section class="panel hud-panel">
-          <div class="panel-title">Skiiing Web</div>
-          <pre id="hud-output">Loading...</pre>
+        <section id="hud-panel" class="panel hud-panel collapsible-panel">
+          <div class="panel-title">
+            <span>Skiiing Web</span>
+            <button id="toggle-hud-panel" class="panel-toggle" type="button" aria-expanded="true">隐藏</button>
+          </div>
+          <div class="panel-body">
+            <pre id="hud-output">Loading...</pre>
+          </div>
         </section>
 
-        <section class="panel minimap-panel">
-          <div class="panel-title">Mini Map</div>
-          <canvas id="mini-map" width="240" height="240"></canvas>
+        <section id="minimap-panel" class="panel minimap-panel collapsible-panel">
+          <div class="panel-title">
+            <span>Mini Map</span>
+            <button id="toggle-minimap-panel" class="panel-toggle" type="button" aria-expanded="true">隐藏</button>
+          </div>
+          <div class="panel-body">
+            <canvas id="mini-map" width="240" height="240"></canvas>
+          </div>
         </section>
 
         <section class="panel preview-panel">
@@ -69,7 +80,7 @@
           <div id="pose-status" class="small-text">Pose runtime idle</div>
         </section>
 
-        <section class="panel control-panel">
+        <section id="control-panel" class="panel control-panel">
           <div class="panel-title">Camera Control</div>
           <label class="field">
             <span>Video Device</span>
