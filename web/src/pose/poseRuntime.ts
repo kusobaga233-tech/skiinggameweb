@@ -36,7 +36,7 @@ export class PoseRuntime {
     const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm");
     this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
       baseOptions: {
-        modelAssetPath: "/models/pose_landmarker_full.task"
+        modelAssetPath: `${import.meta.env.BASE_URL}models/pose_landmarker_full.task`
       },
       runningMode: "VIDEO",
       numPoses: 1,
