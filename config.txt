@@ -1,0 +1,63 @@
+# 体感转向参数。
+# body_steer_gain：身体左右倾斜识别的输入放大倍率；越大，同样倾斜会产生更强转向输入。
+body_steer_gain=5.2
+# body_steer_deadzone：身体倾斜死区；小于该值的轻微晃动会被忽略，避免站立不稳导致误转向。
+body_steer_deadzone=0.04
+# body_steer_alpha：体感转向平滑系数；越小越平滑但延迟更高，越大越灵敏但更抖。
+body_steer_alpha=0.3
+# body_steer_curve_exponent：体感转向曲线指数；越大，小幅倾斜越柔和，大幅倾斜才更明显。
+body_steer_curve_exponent=1.8
+# body_steer_gameplay_scale：体感输入进入游戏后的整体缩放；用于最终微调角色实际转向强度。
+body_steer_gameplay_scale=1.00
+
+# 滑雪速度与下坡加速参数。
+# max_forward_speed：角色最高速度上限，速度表也会按这个值满格显示。
+max_forward_speed=100
+# downhill_speed_boost：下坡坡度转成目标速度的倍率；越大，下坡越容易提速。
+downhill_speed_boost=130
+# acceleration_response：当前速度追向目标速度的响应速度；越大，加速越快、越直接。
+acceleration_response=4
+# drive_speed_boost：撑杆动作提供的持续推进强度。
+drive_speed_boost=16.5
+# drive_downhill_synergy：下坡时撑杆推进的额外协同；越大，下坡撑杆越有力。
+drive_downhill_synergy=0.8
+# tuck_speed_bonus_ratio：下蹲减少阻力后的最高速度增益比例，0.1 表示最多约 +10%。
+tuck_speed_bonus_ratio=0.1
+# start_speed_limit：起步阶段的临时速度限制，避免刚开始瞬间冲太快。
+start_speed_limit=18
+# pump_impulse_boost：每次识别撑杆动作时给角色的瞬时速度增量。
+pump_impulse_boost=5.8
+
+# 卡宾转弯半径参数。
+# carve_radius_min：低速、强转向、抓雪充分时的最小转弯半径；越小，极限转弯越急。
+carve_radius_min=50
+# carve_radius_max：高速时的最大基础转弯半径；越大，高速转弯越钝、弧线越大。
+carve_radius_max=118
+# low_speed_turn_scale：低速时角色朝向变化倍率；越小，低速越不容易快速转头。
+low_speed_turn_scale=0.55
+# carve_radius_input_bias：小幅转向输入附加到半径计算的偏置；越小，小输入越不容易立刻形成明显弧线。
+carve_radius_input_bias=0.08
+# carve_radius_input_floor：半径计算的输入下限；越小，轻微转向时的最低转向强度越低。
+carve_radius_input_floor=0.1
+
+# 搓雪减速参数。
+# turn_snowplow_steer_start：开始进入搓雪减速的转向输入阈值；越小越容易触发。
+turn_snowplow_steer_start=0.5
+# turn_snowplow_steer_release：搓雪保持阈值；转向输入低于该值后会开始退出搓雪。
+turn_snowplow_steer_release=0.36
+# turn_snowplow_steer_full：达到满搓雪强度的转向输入阈值；越小越容易满刹。
+turn_snowplow_steer_full=0.82
+# turn_snowplow_hold_duration：搓雪强度爬满所需时间；越小，刹车进入越快。
+turn_snowplow_hold_duration=0.18
+# turn_snowplow_release_duration：失去搓雪输入后的释放时间；越小，松开后越快退出。
+turn_snowplow_release_duration=0.16
+# turn_snowplow_min_speed：当前速度达到该值后，搓雪才会产生减速；低于该速度不扣速度。
+turn_snowplow_min_speed=35
+# turn_snowplow_max_blend：搓雪最大强度，1 表示允许达到 100% 搓雪减速。
+turn_snowplow_max_blend=1.0
+# turn_snowplow_speed_reduction：满搓雪时每秒直接压低速度的强度；越大，高速越能快速降下来。
+turn_snowplow_speed_reduction=120
+# snowplow_stop_response_min：低强度搓雪时速度追向低目标的响应。
+snowplow_stop_response_min=4
+# snowplow_stop_response_max：满搓雪时速度追向低目标的响应；越大越接近急刹。
+snowplow_stop_response_max=12

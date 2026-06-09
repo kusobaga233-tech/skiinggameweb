@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Skiing Lady Preview</title>
+    <script type="module" crossorigin src="./assets/modelPreview-D7FXRuyH.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-B5Qt9EMX.js">
+    <link rel="modulepreload" crossorigin href="./assets/babylon-DzXKDs_K.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-BUgbm7eu.js">
+    <link rel="stylesheet" crossorigin href="./assets/modelPreview-CaLQuJu9.css">
+  </head>
+  <body>
+    <main class="preview-shell">
+      <canvas id="model-preview-canvas" aria-label="GLB model preview"></canvas>
+
+      <section class="info-panel">
+        <div class="panel-header">
+          <div>
+            <div class="eyebrow">Model Preview</div>
+            <h1>Skiing Lady GLB</h1>
+          </div>
+          <a class="back-link" href="/">返回主游戏</a>
+        </div>
+
+        <p id="preview-status" class="status-line">正在初始化预览场景...</p>
+
+        <div class="control-grid">
+          <label class="field">
+            <span>动画</span>
+            <select id="animation-select"></select>
+          </label>
+
+          <button id="toggle-animation" type="button">暂停动画</button>
+        </div>
+
+        <dl class="meta-grid">
+          <div>
+            <dt>相机</dt>
+            <dd>鼠标左键旋转，滚轮缩放，右键平移</dd>
+          </div>
+          <div>
+            <dt>已隐藏 mesh</dt>
+            <dd id="hidden-meshes">检测中...</dd>
+          </div>
+          <div>
+            <dt>动画状态</dt>
+            <dd id="animation-state">检测中...</dd>
+          </div>
+          <div>
+            <dt>模型资源</dt>
+            <dd><code>character/skiing_lady.glb</code></dd>
+          </div>
+        </dl>
+      </section>
+    </main>
+
+  </body>
+</html>

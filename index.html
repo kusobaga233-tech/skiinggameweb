@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Skiiing Web</title>
+    <script type="module" crossorigin src="./assets/main-B6-m7HjH.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-B5Qt9EMX.js">
+    <link rel="modulepreload" crossorigin href="./assets/babylon-DzXKDs_K.js">
+    <link rel="stylesheet" crossorigin href="./assets/main-B8jUnTin.css">
+  </head>
+  <body>
+    <div id="app-shell">
+      <canvas id="game-canvas"></canvas>
+      <div id="overlay">
+        <div class="track-switcher" aria-label="Track Switcher">
+          <button id="track-1-button" type="button">赛道1</button>
+          <button id="track-2-button" type="button">赛道2</button>
+        </div>
+
+        <div id="boost-tutorial-shell" class="boost-tutorial-shell">
+          <video
+            id="boost-tutorial-video"
+            class="boost-tutorial-video"
+            src="./tutorials/pump-demo.mp4"
+            autoplay
+            muted
+            loop
+            playsinline
+            preload="auto"
+          ></video>
+        </div>
+
+        <div id="start-boost-shell" class="start-boost-shell">
+          <div class="start-boost-label">START POLE</div>
+          <div class="start-boost-track">
+            <div id="start-boost-fill" class="start-boost-fill"></div>
+          </div>
+          <div id="start-boost-value" class="start-boost-value">READY</div>
+        </div>
+
+        <div id="speed-meter" class="speed-meter" aria-label="Speed Meter">
+          <div class="speed-meter-label">SPEED</div>
+          <div class="speed-meter-main">
+            <span id="speed-meter-value" class="speed-meter-value">0.0</span>
+            <span class="speed-meter-unit">KM/H</span>
+          </div>
+          <div class="speed-meter-track">
+            <div id="speed-meter-bar" class="speed-meter-bar"></div>
+          </div>
+        </div>
+
+        <section class="panel hud-panel">
+          <div class="panel-title">Skiiing Web</div>
+          <pre id="hud-output">Loading...</pre>
+        </section>
+
+        <section class="panel minimap-panel">
+          <div class="panel-title">Mini Map</div>
+          <canvas id="mini-map" width="240" height="240"></canvas>
+        </section>
+
+        <section class="panel preview-panel">
+          <div class="panel-title">Camera Preview</div>
+          <div class="preview-stage">
+            <video id="camera-preview" autoplay playsinline muted></video>
+            <canvas id="pose-overlay"></canvas>
+          </div>
+          <div id="pose-status" class="small-text">Pose runtime idle</div>
+        </section>
+
+        <section class="panel control-panel">
+          <div class="panel-title">Camera Control</div>
+          <label class="field">
+            <span>Video Device</span>
+            <select id="camera-select"></select>
+          </label>
+          <div class="button-row">
+            <button id="refresh-cameras" type="button">Refresh</button>
+            <button id="apply-camera" type="button">Apply</button>
+            <button id="restart-run" type="button">Restart Run</button>
+            <button id="toggle-pause" type="button">Pause Game</button>
+          </div>
+          <div id="camera-status" class="small-text">Camera idle</div>
+          <div id="controls-hint" class="small-text">
+            Fallback: A/D steer, S tuck, Shift brake, Space jump
+          </div>
+          <div id="mesh-pick-output" class="small-text debug-pick-output">
+            Pause the game to inspect scene meshes.
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+  </html>
