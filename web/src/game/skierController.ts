@@ -88,6 +88,8 @@ export class SkierController {
   private readonly uphillSpeedPenalty = 12;
   private readonly minForwardSpeed = 7.5;
   private readonly maxForwardSpeed: number;
+  private readonly maxFrameTravelScale = 1.8;
+  private readonly minFrameTravelLimit = 2.5;
   private readonly startSpeedLimit: number;
   private readonly startSpeedReleaseZ = 180;
   private readonly visualPitchInfluence = 1.15;
@@ -365,7 +367,8 @@ export class SkierController {
     const turnPreview = upcomingTurnPreview;
     const previousX = this.skier.position.x;
     this.updateCarvingVelocity(this.currentForwardSpeed, effectiveBrakeBlend, downhillFactor, dt, groundedForCarve);
-    const proposedZ = this.skier.position.z + this.velocity.z * dt;
+    const rawProposedZ = this.skier.position.z + this.velocity.z * dt;
+    const proposedZ = this.clampFrameTravel(previousZ, rawProposedZ, dt);
     const courseCenterX = evaluateCourseCenterX(proposedZ);
     const laneHalfWidth = Math.max(0.6, this.course.courseHalfWidth - this.boundaryPadding);
     const minLaneX = courseCenterX - laneHalfWidth;
@@ -406,7 +409,7 @@ export class SkierController {
     }
     this.updateVerticalMotion(courseGroundY, dt);
 
-    this.runSession.evaluateGate(this.skier.position.x, this.skier.position.z);
+    this.runSession.evaluateGate(this.skier.position.x, previousZ, this.skier.position.z);
     const animationPreview = evaluateTurnPreviewAssist(this.skier.position.z + 2, this.course.turnMarkers);
     const animationTurnBlend = this.evaluateTurnFollowBlend(animationPreview.blend);
     const animationRouteBias = this.evaluateRoutePreviewBias(this.skier.position.z + 2);
@@ -503,6 +506,21 @@ export class SkierController {
     }
 
     return positionWasFinite && velocityWasFinite && scalarWasFinite;
+  }
+
+  private clampFrameTravel(previousZ: number, proposedZ: number, dt: number): number {
+    if (!Number.isFinite(previousZ)) {
+      return 0;
+    }
+    if (!Number.isFinite(proposedZ) || !Number.isFinite(dt)) {
+      return previousZ;
+    }
+
+    const maxForwardStep = Math.max(
+      this.minFrameTravelLimit,
+      this.maxForwardSpeed * Math.max(dt, 0) * this.maxFrameTravelScale
+    );
+    return this.clamp(proposedZ, previousZ - this.minFrameTravelLimit, previousZ + maxForwardStep);
   }
 
   private updateCamera(turnPreview: ReturnType<typeof evaluateTurnPreviewAssist>): void {

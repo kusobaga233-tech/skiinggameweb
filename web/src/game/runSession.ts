@@ -57,13 +57,13 @@ export class RunSession {
     }
   }
 
-  evaluateGate(skierX: number, skierZ: number): void {
-    if (!Number.isFinite(skierX) || !Number.isFinite(skierZ)) {
+  evaluateGate(skierX: number, previousSkierZ: number, skierZ: number): void {
+    if (!Number.isFinite(skierX) || !Number.isFinite(previousSkierZ) || !Number.isFinite(skierZ)) {
       return;
     }
 
     const gate = this.course.gates.find((item) => item.state === "pending");
-    if (!gate || skierZ < gate.z) {
+    if (!gate || !(previousSkierZ < gate.z && skierZ >= gate.z)) {
       return;
     }
 
