@@ -31,6 +31,7 @@
     "check:panel-toggle": "node scripts/check-panel-toggle.mjs",
     "check:pause-inspector": "node scripts/check-pause-inspector.mjs",
     "check:pose-model-path": "node scripts/check-pose-model-base-url.mjs",
+    "check:pose-finite": "node scripts/check-pose-finite-guard.mjs",
     "check:pose-overlay": "node scripts/check-pose-overlay-cover.mjs",
     "check:pose-snowplow": "node scripts/check-pose-snowplow-input.mjs",
     "check:pole-plant-steering": "node scripts/check-pole-plant-steering.mjs",

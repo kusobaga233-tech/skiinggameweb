@@ -104,9 +104,9 @@ export class PoseRuntime {
 
     return {
       landmarks: landmarks.map((landmark) => ({
-        x: landmark.x,
-        y: landmark.y,
-        visible: landmark.x >= 0 && landmark.x <= 1 && landmark.y >= 0 && landmark.y <= 1
+        x: Number.isFinite(landmark?.x) ? landmark.x : 0,
+        y: Number.isFinite(landmark?.y) ? landmark.y : 0,
+        visible: this.isLandmarkInFrame(landmark)
       }))
     };
   }
@@ -133,14 +133,14 @@ export class PoseRuntime {
       };
     }
 
-    const leftHip = landmarks[23];
-    const rightHip = landmarks[24];
-    const leftShoulder = landmarks[11];
-    const rightShoulder = landmarks[12];
-    const leftElbow = landmarks[13];
-    const rightElbow = landmarks[14];
-    const leftWrist = landmarks[15];
-    const rightWrist = landmarks[16];
+    const leftHip = this.landmarkOrEmpty(landmarks[23]);
+    const rightHip = this.landmarkOrEmpty(landmarks[24]);
+    const leftShoulder = this.landmarkOrEmpty(landmarks[11]);
+    const rightShoulder = this.landmarkOrEmpty(landmarks[12]);
+    const leftElbow = this.landmarkOrEmpty(landmarks[13]);
+    const rightElbow = this.landmarkOrEmpty(landmarks[14]);
+    const leftWrist = this.landmarkOrEmpty(landmarks[15]);
+    const rightWrist = this.landmarkOrEmpty(landmarks[16]);
 
     const hipCenterX = (leftHip.x + rightHip.x) * 0.5;
     const hipCenterY = (leftHip.y + rightHip.y) * 0.5;
@@ -176,19 +176,19 @@ export class PoseRuntime {
   }
 
   private toJoint(landmark: NormalizedLandmark): PoseJointSample {
-    const visible = landmark.x >= 0 && landmark.x <= 1 && landmark.y >= 0 && landmark.y <= 1;
+    const visible = this.isLandmarkInFrame(landmark);
     return {
-      x: landmark.x,
-      y: landmark.y,
-      z: landmark.z,
+      x: Number.isFinite(landmark.x) ? landmark.x : 0,
+      y: Number.isFinite(landmark.y) ? landmark.y : 0,
+      z: Number.isFinite(landmark.z) ? landmark.z : 0,
       visible
     };
   }
 
   private legLength(landmarks: NormalizedLandmark[], hipIndex: number, kneeIndex: number, ankleIndex: number): number {
-    const hip = landmarks[hipIndex];
-    const knee = landmarks[kneeIndex];
-    const ankle = landmarks[ankleIndex];
+    const hip = this.landmarkOrEmpty(landmarks[hipIndex]);
+    const knee = this.landmarkOrEmpty(landmarks[kneeIndex]);
+    const ankle = this.landmarkOrEmpty(landmarks[ankleIndex]);
     const upper = Math.hypot(knee.x - hip.x, knee.y - hip.y);
     const lower = Math.hypot(ankle.x - knee.x, ankle.y - knee.y);
     return Math.max(upper + lower, 1e-3);
@@ -197,7 +197,29 @@ export class PoseRuntime {
   private landmarksInFrame(landmarks: NormalizedLandmark[], indices: number[]): boolean {
     return indices.every((index) => {
       const landmark = landmarks[index];
-      return landmark && landmark.x >= 0 && landmark.x <= 1 && landmark.y >= 0 && landmark.y <= 1;
+      return this.isLandmarkInFrame(landmark);
     });
+  }
+
+  private landmarkOrEmpty(landmark: NormalizedLandmark | undefined): NormalizedLandmark {
+    const source = landmark ?? { x: 0, y: 0, z: 0, visibility: 0 };
+    return {
+      x: Number.isFinite(source.x) ? source.x : 0,
+      y: Number.isFinite(source.y) ? source.y : 0,
+      z: Number.isFinite(source.z) ? source.z : 0,
+      visibility: Number.isFinite(source.visibility) ? source.visibility : 0
+    };
+  }
+
+  private isLandmarkInFrame(landmark: NormalizedLandmark | undefined): boolean {
+    return Boolean(
+      landmark
+      && Number.isFinite(landmark.x)
+      && Number.isFinite(landmark.y)
+      && landmark.x >= 0
+      && landmark.x <= 1
+      && landmark.y >= 0
+      && landmark.y <= 1
+    );
   }
 }

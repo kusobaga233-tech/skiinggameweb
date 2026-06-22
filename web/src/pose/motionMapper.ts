@@ -94,6 +94,22 @@ function ema(previous: number, current: number, alpha: number): number {
   return previous + (current - previous) * clamp(alpha, 0, 1);
 }
 
+function finiteOr(value: number, fallback: number): number {
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function sanitizeJoint(joint: PoseSample["leftShoulder"]): PoseSample["leftShoulder"] {
+  const x = finiteOr(joint.x, 0);
+  const y = finiteOr(joint.y, 0);
+  const z = finiteOr(joint.z, 0);
+  return {
+    x,
+    y,
+    z,
+    visible: joint.visible && Number.isFinite(joint.x) && Number.isFinite(joint.y) && Number.isFinite(joint.z)
+  };
+}
+
 export class MotionMapper {
   private readonly config: MotionMapperConfig;
   private previousKneeRatio: number | null = null;
@@ -116,6 +132,7 @@ export class MotionMapper {
   }
 
   mapSample(sample: PoseSample): MotionState {
+    sample = this.sanitizeSample(sample);
     this.updateBaseline(sample);
     const lockActive = sample.timestampMs < this.boostLockedUntilMs;
     const initialBoostRemainingMs = lockActive ? Math.max(0, this.boostLockedUntilMs - sample.timestampMs) : 0;
@@ -381,6 +398,47 @@ export class MotionMapper {
     }
 
     this.baselineKneeRatio = Math.max(this.baselineKneeRatio, sample.kneeRatio);
+  }
+
+  private sanitizeSample(sample: PoseSample): PoseSample {
+    const sanitized: PoseSample = {
+      ...sample,
+      timestampMs: finiteOr(sample.timestampMs, 0),
+      dt: finiteOr(sample.dt, 1 / 30),
+      hipCenterX: finiteOr(sample.hipCenterX, 0.5),
+      hipCenterY: finiteOr(sample.hipCenterY, 0.62),
+      shoulderCenterX: finiteOr(sample.shoulderCenterX, 0.5),
+      shoulderCenterY: finiteOr(sample.shoulderCenterY, 0.38),
+      kneeRatio: finiteOr(sample.kneeRatio, 1),
+      confidence: finiteOr(sample.confidence, 0),
+      legConfidence: finiteOr(sample.legConfidence, 0),
+      armConfidence: finiteOr(sample.armConfidence, 0),
+      leftShoulder: sanitizeJoint(sample.leftShoulder),
+      rightShoulder: sanitizeJoint(sample.rightShoulder),
+      leftElbow: sanitizeJoint(sample.leftElbow),
+      rightElbow: sanitizeJoint(sample.rightElbow),
+      leftWrist: sanitizeJoint(sample.leftWrist),
+      rightWrist: sanitizeJoint(sample.rightWrist)
+    };
+
+    const requiredTrackingValues = [
+      sample.hipCenterX,
+      sample.hipCenterY,
+      sample.shoulderCenterX,
+      sample.shoulderCenterY,
+      sample.kneeRatio,
+      sample.confidence,
+      sample.legConfidence,
+      sample.armConfidence
+    ];
+    const validCoreValues = requiredTrackingValues.every(Number.isFinite);
+    if (!validCoreValues) {
+      sanitized.confidence = 0;
+      sanitized.legConfidence = 0;
+      sanitized.armConfidence = 0;
+    }
+
+    return sanitized;
   }
 
   private updateLeanBaseline(lean: number, lockActive: boolean): void {
