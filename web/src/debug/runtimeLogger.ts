@@ -52,21 +52,21 @@ export class RuntimeLogger {
 
     this.lastHudCaptureMs = now;
     this.capture("hud.frame", {
-      speed: this.round(state.speed),
-      playerX: this.round(state.playerX),
-      playerZ: this.round(state.playerZ),
-      elapsedTime: this.round(state.elapsedTime),
+      speed: this.formatNumber(state.speed),
+      playerX: this.formatNumber(state.playerX),
+      playerZ: this.formatNumber(state.playerZ),
+      elapsedTime: this.formatNumber(state.elapsedTime),
       started: state.started,
       completed: state.completed,
       paused: state.paused,
       gates: `${state.clearedGates}/${state.totalGates}`,
       missedGates: state.missedGates,
-      edgeHold: this.round(state.edgeHold),
-      driftSlip: this.round(state.driftSlip),
+      edgeHold: this.formatNumber(state.edgeHold),
+      driftSlip: this.formatNumber(state.driftSlip),
       cameraLabel: state.cameraLabel,
       poseMessage: state.poseMessage,
-      poseFps: this.round(state.poseFps),
-      inferenceMs: this.round(state.inferenceMs),
+      poseFps: this.formatNumber(state.poseFps),
+      inferenceMs: this.formatNumber(state.inferenceMs),
       motion: this.summarizeMotion(state.motion)
     });
   }
@@ -95,21 +95,25 @@ export class RuntimeLogger {
     return {
       source: motion.source,
       tracking: motion.tracking,
-      confidence: this.round(motion.confidence),
-      steer: this.round(motion.steer),
-      tuck: this.round(motion.tuck),
-      drive: this.round(motion.drive),
-      snowplow: this.round(motion.snowplow),
-      brake: this.round(motion.brake),
+      confidence: this.formatNumber(motion.confidence),
+      steer: this.formatNumber(motion.steer),
+      tuck: this.formatNumber(motion.tuck),
+      drive: this.formatNumber(motion.drive),
+      snowplow: this.formatNumber(motion.snowplow),
+      brake: this.formatNumber(motion.brake),
       pumpTriggered: motion.pumpTriggered,
       pumpActive: motion.pumpActive,
       pumpHits: motion.pumpHits,
       boostLocked: motion.boostLocked,
-      boostRemainingMs: Math.round(motion.boostRemainingMs)
+      boostRemainingMs: this.formatNumber(motion.boostRemainingMs)
     };
   }
 
-  private round(value: number): number {
-    return Number.isFinite(value) ? Math.round(value * 1000) / 1000 : 0;
+  private formatNumber(value: number): number | { nonFiniteNumber: string } {
+    if (!Number.isFinite(value)) {
+      return { nonFiniteNumber: String(value) };
+    }
+
+    return Math.round(value * 1000) / 1000;
   }
 }

@@ -244,6 +244,7 @@ export class SkierController {
   }
 
   update(motion: MotionState, dt: number, movementEnabled = true): SkierSnapshot {
+    this.sanitizeRuntimeState();
     const sourceSteerScale = motion.source === "pose" ? this.poseSteerScale : 1;
     const steerTarget = movementEnabled && motion.tracking ? this.clamp(motion.steer * sourceSteerScale, -1, 1) : 0;
     const targetTuck = motion.tracking ? motion.tuck : 0;
@@ -387,6 +388,9 @@ export class SkierController {
     this.velocity.x = naturalLateralVelocity;
     this.velocity.z = (this.skier.position.z - previousZ) / Math.max(dt, 1e-5);
     this.currentForwardSpeed = Math.min(this.maxForwardSpeed, Math.hypot(this.velocity.x, this.velocity.z));
+    if (!this.sanitizeRuntimeState()) {
+      return this.createSnapshot(false, true);
+    }
     if (wallCollisionDetected && !this.wallCollisionLatched) {
       this.currentForwardSpeed *= this.wallCollisionSpeedRetention;
       this.velocity.scaleInPlace(this.wallCollisionSpeedRetention);
@@ -420,7 +424,12 @@ export class SkierController {
     );
     this.updateVisualHeading();
     this.updateCamera(turnPreview);
+    this.sanitizeRuntimeState();
 
+    return this.createSnapshot(true, !this.airborne);
+  }
+
+  private createSnapshot(movementEnabled: boolean, grounded: boolean): SkierSnapshot {
     return {
       position: this.skier.position.clone(),
       currentSteer: this.currentSteer,
@@ -428,8 +437,72 @@ export class SkierController {
       currentForwardSpeed: this.currentForwardSpeed,
       edgeHold: this.edgeHold,
       driftSlip: this.driftSlip,
-      snowTrail: this.createSnowTrailState(true, !this.airborne)
+      snowTrail: this.createSnowTrailState(movementEnabled, grounded)
     };
+  }
+
+  private sanitizeRuntimeState(): boolean {
+    const positionWasFinite =
+      Number.isFinite(this.skier.position.x)
+      && Number.isFinite(this.skier.position.y)
+      && Number.isFinite(this.skier.position.z);
+    const velocityWasFinite =
+      Number.isFinite(this.velocity.x)
+      && Number.isFinite(this.velocity.y)
+      && Number.isFinite(this.velocity.z);
+    const scalarWasFinite =
+      Number.isFinite(this.currentForwardSpeed)
+      && Number.isFinite(this.currentSteer)
+      && Number.isFinite(this.currentTuck)
+      && Number.isFinite(this.movementHeadingYaw)
+      && Number.isFinite(this.driftSlip)
+      && Number.isFinite(this.edgeHold)
+      && Number.isFinite(this.verticalVelocity);
+
+    if (!positionWasFinite || !velocityWasFinite || !scalarWasFinite) {
+      const safeZ = Number.isFinite(this.skier.position.z)
+        ? this.clamp(this.skier.position.z, 0, this.course.length)
+        : 0;
+      const safeX = evaluateCourseCenterX(safeZ);
+      const safeY = sampleGroundHeight(this.course, safeX, safeZ) + this.groundOffsetY;
+      this.skier.position.copyFromFloats(safeX, safeY, safeZ);
+      this.velocity.set(0, 0, 0);
+      this.currentForwardSpeed = 0;
+      this.lastFrameDeltaX = 0;
+      this.lastLateralVelocity = 0;
+      this.verticalVelocity = 0;
+      this.airborne = false;
+      this.movementHeadingYaw = 0;
+      this.driftSlip = 0;
+      this.edgeHold = 0;
+      this.wallCollisionLatched = false;
+    }
+
+    if (!Number.isFinite(this.camera.alpha)) {
+      this.camera.alpha = this.baseCameraAlpha;
+    }
+    if (!Number.isFinite(this.camera.beta)) {
+      this.camera.beta = 0.98;
+    }
+    if (!Number.isFinite(this.camera.radius) || this.camera.radius <= 0) {
+      this.camera.radius = 10.1;
+    }
+    if (!Number.isFinite(this.camera.fov) || this.camera.fov <= 0) {
+      this.camera.fov = this.baseCameraFov;
+    }
+    if (
+      !Number.isFinite(this.camera.target.x)
+      || !Number.isFinite(this.camera.target.y)
+      || !Number.isFinite(this.camera.target.z)
+    ) {
+      this.camera.target.copyFromFloats(
+        this.skier.position.x,
+        this.skier.position.y + SKIER_BODY_ROOT_OFFSET_Y + 0.9,
+        this.skier.position.z
+      );
+    }
+
+    return positionWasFinite && velocityWasFinite && scalarWasFinite;
   }
 
   private updateCamera(turnPreview: ReturnType<typeof evaluateTurnPreviewAssist>): void {

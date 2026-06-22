@@ -35,6 +35,10 @@ export class RunSession {
   }
 
   update(dt: number, skierZ: number, startTriggered: boolean): void {
+    if (!Number.isFinite(skierZ) || !Number.isFinite(dt)) {
+      return;
+    }
+
     if (this.stats.completed) {
       return;
     }
@@ -54,6 +58,10 @@ export class RunSession {
   }
 
   evaluateGate(skierX: number, skierZ: number): void {
+    if (!Number.isFinite(skierX) || !Number.isFinite(skierZ)) {
+      return;
+    }
+
     const gate = this.course.gates.find((item) => item.state === "pending");
     if (!gate || skierZ < gate.z) {
       return;
@@ -75,6 +83,10 @@ export class RunSession {
     skierZ: number,
     jumpHeld: boolean
   ): { launchBoost: number; airBonus: boolean } | null {
+    if (!Number.isFinite(skierX) || !Number.isFinite(previousSkierZ) || !Number.isFinite(skierZ)) {
+      return null;
+    }
+
     const minSkierZ = Math.min(previousSkierZ, skierZ);
     const maxSkierZ = Math.max(previousSkierZ, skierZ);
     const ramp = this.course.ramps.find((item) => {
