@@ -54,6 +54,7 @@
     "check:track-switching": "node scripts/check-track-switching.mjs",
     "check:steering": "node scripts/check-steering-behavior.mjs",
     "check:heading": "node scripts/check-heading-persistence.mjs",
+    "check:tuck-relaxed": "node scripts/check-tuck-relaxed-detection.mjs",
     "check:tuck": "node scripts/check-tuck-detection.mjs",
     "check:turn-snowplow": "node scripts/check-turn-snowplow-brake.mjs",
     "check:turn-entry-arrows": "node scripts/check-turn-entry-arrows.mjs",

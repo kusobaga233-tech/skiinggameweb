@@ -14,6 +14,8 @@ export interface MotionMapperConfig {
   neutralDecayAlpha: number;
   crouchThreshold: number;
   standThreshold: number;
+  tuckStartThreshold: number;
+  tuckFullThreshold: number;
   brakeCrouchStartThreshold: number;
   brakeCrouchFullThreshold: number;
   brakeSteerStartThreshold: number;
@@ -55,6 +57,8 @@ const DEFAULT_CONFIG: MotionMapperConfig = {
   neutralDecayAlpha: 0.2,
   crouchThreshold: 0.82,
   standThreshold: 0.92,
+  tuckStartThreshold: 0.99,
+  tuckFullThreshold: 0.84,
   brakeCrouchStartThreshold: 0.95,
   brakeCrouchFullThreshold: 0.84,
   brakeSteerStartThreshold: 0.24,
@@ -159,10 +163,9 @@ export class MotionMapper {
     let tuckRaw = 0;
     if (legTracking) {
       const normalizedKnee = clamp(sample.kneeRatio / Math.max(this.baselineKneeRatio, 1e-5), 0.5, 1.08);
-      const tuckStartThreshold = 0.97;
-      const tuckFullThreshold = 0.86;
       tuckRaw = clamp(
-        (tuckStartThreshold - normalizedKnee) / Math.max(tuckStartThreshold - tuckFullThreshold, 1e-5),
+        (this.config.tuckStartThreshold - normalizedKnee)
+          / Math.max(this.config.tuckStartThreshold - this.config.tuckFullThreshold, 1e-5),
         0,
         1
       );
@@ -178,6 +181,9 @@ export class MotionMapper {
         1
       );
       tuckRaw *= 0.78;
+      if (tuckRaw <= 0.01) {
+        this.tuckSmoothed = 0;
+      }
     } else {
       this.previousKneeRatio = null;
     }
