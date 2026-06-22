@@ -23,6 +23,7 @@
     "check:keyboard-fallback": "node scripts/check-keyboard-fallback.mjs",
     "check:gameplay-line": "node scripts/check-gameplay-line-assist.mjs",
     "check:large-ramp": "node scripts/check-large-ramp.mjs",
+    "check:log-export": "node scripts/check-log-export.mjs",
     "check:low-speed-turn": "node scripts/check-low-speed-turn-config.mjs",
     "check:minimap": "node scripts/check-minimap.mjs",
     "check:animation-debugger": "node scripts/check-animation-debugger.mjs",

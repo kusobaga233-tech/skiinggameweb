@@ -13,6 +13,7 @@ import { PoseOverlay } from "./ui/poseOverlay";
 import { SpeedMeter } from "./ui/speedMeter";
 import { StartBoostMeter } from "./ui/startBoostMeter";
 import { loadRuntimeConfig } from "./config/runtimeConfig";
+import { RuntimeLogger } from "./debug/runtimeLogger";
 import type { TrackCourseId } from "./game/trackCourse";
 
 function requiredElement<T extends HTMLElement>(id: string): T {
@@ -44,6 +45,7 @@ const refreshButton = requiredElement<HTMLButtonElement>("refresh-cameras");
 const applyButton = requiredElement<HTMLButtonElement>("apply-camera");
 const restartButton = requiredElement<HTMLButtonElement>("restart-run");
 const pauseButton = requiredElement<HTMLButtonElement>("toggle-pause");
+const downloadLogButton = requiredElement<HTMLButtonElement>("download-log");
 const meshPickOutput = requiredElement<HTMLElement>("mesh-pick-output");
 const track1Button = requiredElement<HTMLButtonElement>("track-1-button");
 const track2Button = requiredElement<HTMLButtonElement>("track-2-button");
@@ -61,6 +63,7 @@ const startBoostMeter = new StartBoostMeter(startBoostShell, startBoostFill, sta
 const speedMeter = new SpeedMeter(speedMeterShell, speedMeterValue, speedMeterBar, speedMeterGates);
 const controlPanel = new ControlPanel(cameraSelect, cameraStatus);
 const poseOverlay = new PoseOverlay(poseOverlayCanvas, video);
+const runtimeLogger = new RuntimeLogger();
 const selectedCameraStorageKey = "skiiing.web.selectedCamera";
 const selectedTrackStorageKey = "skiiing.web.selectedTrack";
 
@@ -175,6 +178,7 @@ async function ensureGameApp(): Promise<GameApp> {
         miniMap = new MiniMap(miniMapCanvas, app.getCourse());
         app.start((hudState) => {
           app.setMotionState(currentMotion());
+          runtimeLogger.captureHudState(hudState);
           hud.render(hudState);
           speedMeter.render(hudState);
           boostTutorialVideo.render(hudState.motion);
@@ -188,6 +192,7 @@ async function ensureGameApp(): Promise<GameApp> {
       .catch((error: unknown) => {
         gameAppPromise = null;
         const message = error instanceof Error ? error.message : String(error);
+        runtimeLogger.capture("game.startup_error", { message });
         showFatalStartupError(message);
         throw error;
       });
@@ -330,6 +335,7 @@ refreshButton.addEventListener("click", async () => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     controlPanel.setStatus(`Refresh failed: ${message}`);
+    runtimeLogger.capture("camera.refresh_failed", { message });
   }
 });
 
@@ -340,6 +346,7 @@ applyButton.addEventListener("click", async () => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     controlPanel.setStatus(`Camera start failed: ${message}`);
+    runtimeLogger.capture("camera.start_failed", { message });
     gameApp?.setPoseStatus(`Camera start failed: ${message}`, 0, 0);
     poseOverlay.clear();
   }
@@ -368,7 +375,13 @@ track2Button.addEventListener("click", async () => {
 pauseButton.addEventListener("click", async () => {
   const app = await ensureGameApp();
   const paused = app.togglePaused();
+  runtimeLogger.capture("game.pause_toggled", { paused });
   syncPauseUi(paused);
+});
+
+downloadLogButton.addEventListener("click", () => {
+  runtimeLogger.capture("log.download_requested");
+  runtimeLogger.downloadJson();
 });
 
 canvas.addEventListener("click", async (event) => {
@@ -395,6 +408,7 @@ void (async () => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     controlPanel.setStatus(`Camera scan failed: ${message}`);
+    runtimeLogger.capture("camera.scan_failed", { message });
   }
 
   try {
@@ -402,11 +416,13 @@ void (async () => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     controlPanel.setStatus(`Camera unavailable: ${message}`);
+    runtimeLogger.capture("camera.unavailable", { message });
     app.setPoseStatus(`Camera unavailable: ${message}`, 0, 0);
     poseOverlay.clear();
   }
 })().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
+  runtimeLogger.capture("startup.failed", { message });
   showFatalStartupError(message);
   gameApp?.setPoseStatus(`Startup failed: ${message}`, 0, 0);
 });
